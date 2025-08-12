@@ -93,7 +93,7 @@ def uniform(low: float,
 
 
 def empty(shape, dtype=None, device=None, requires_grad=False):
-    return Tensor(np.empty(shape),
+    return Tensor(np.empty(shape, dtype=dtype),
                   dtype=dtype,
                   device=device,
                   requires_grad=requires_grad)

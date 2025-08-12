@@ -29,13 +29,13 @@ def _calculate_fan(tensor: Tensor):
 
 @no_grad()
 def uniform_(tensor: Tensor, a=0., b=1.) -> Tensor:
-    tensor.data = uniform(a, b, tensor.shape)
+    tensor.data[...] = uniform(a, b, tensor.shape)
     return tensor
 
 
 @no_grad()
 def normal_(tensor: Tensor, mean=0., std=1.) -> Tensor:
-    tensor.data = normal(mean, std, size=tensor.shape)
+    tensor.data[...] = normal(mean, std, size=tensor.shape)
     return tensor
 
 

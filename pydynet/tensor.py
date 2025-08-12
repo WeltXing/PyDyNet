@@ -34,7 +34,7 @@ def backward_subroutine(last, node):
             axis = (-i for i in range(1, dim2 + 1) if last.shape[-i] == 1)
             add_grad = node.xp.sum(add_grad, axis=tuple(axis), keepdims=True)
             if dim1 != dim2:  # dim1 >= dim2 for sure
-                add_grad = add_grad.sum(range(dim1 - dim2))
+                add_grad = add_grad.sum(tuple(range(dim1 - dim2)))
         last.grad += add_grad
     return last
 
@@ -90,7 +90,7 @@ class Tensor:
             self.data = self.xp.array(data, dtype)
 
         self.requires_grad: bool = requires_grad and is_grad_enable()
-        if self.requires_grad and self.dtype != float:
+        if self.requires_grad and not np.issubdtype(self.dtype, np.floating):
             raise TypeError(
                 "Only Tensors of floating point dtype can require gradients!")
         self.grad = self.xp.zeros(self.shape) if self.requires_grad else None
@@ -213,11 +213,15 @@ class Tensor:
     ):
         return sum(self, axis, keepdims)
 
-    def argmax(self, axis: Union[int, Tuple, None] = None):
-        return argmax(self, axis)
+    def argmax(self,
+               axis: Union[int, Tuple, None] = None,
+               keepdims: bool = False):
+        return argmax(self, axis, keepdims)
 
-    def argmin(self, axis: Union[int, Tuple, None] = None):
-        return argmin(self, axis)
+    def argmin(self,
+               axis: Union[int, Tuple, None] = None,
+               keepdims: bool = False):
+        return argmin(self, axis, keepdims)
 
     def build_edge(self, node):
         '''构建两节点的有向边, 正常不适用'''
@@ -295,7 +299,7 @@ class Tensor:
         >>> x
         <[0 0 3], int64, Tensor>
         '''
-        if self.requires_grad:
+        if is_grad_enable():
             raise ValueError(
                 "In-place operation is forbidden in node requires grad.")
         if isinstance(key, Tensor):
@@ -867,28 +871,30 @@ class min(UnaryOperator):
 
 class argmax(Tensor):
 
-    def __init__(self, x: Tensor, axis=None) -> None:
+    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         if not isinstance(x, Tensor):
             x = Tensor(x)
         self.axis = axis
+        self.keepdims = keepdims
         self.device = x.device
         super().__init__(self.forward(x), device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
-        return self.xp.argmax(x.data, axis=self.axis)
+        return self.xp.argmax(x.data, axis=self.axis, keepdims=self.keepdims)
 
 
 class argmin(Tensor):
 
-    def __init__(self, x: Tensor, axis=None) -> None:
+    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         if not isinstance(x, Tensor):
             x = Tensor(x)
         self.axis = axis
+        self.keepdims = keepdims
         self.device = x.device
         super().__init__(self.forward(x), device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
-        return self.xp.argmin(x.data, axis=self.axis)
+        return self.xp.argmin(x.data, axis=self.axis, keepdims=self.keepdims)
 
 
 class exp(UnaryOperator):
@@ -1059,7 +1065,7 @@ class get_slice(UnaryOperator):
         return full_grad
 
 
-class concatenate(Tensor):
+class concat(Tensor):
     '''对多个张量进行连接, 用法类似于`numpy.concatenate`
     
     Parameters
