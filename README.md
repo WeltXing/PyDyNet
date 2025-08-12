@@ -11,25 +11,17 @@
 ![](https://img.shields.io/github/stars/Kaslanarian/PyDyNet?style=social)
 ![](https://img.shields.io/github/forks/Kaslanarian/PyDyNet?style=social)
 
-<details><summary>前期更新日志</summary>
-<p>
+## Towards Large Language Model
 
-- 5.10: ver 0.0.1 修改损失函数的定义方式：加入reduction机制，加入Embedding;
-- 5.15: ver 0.0.2 重构了RNN, LSTM和GRU，支持双向;
-- 5.16: ver 0.0.2 允许PyDyNet作为第三方库安装；开始手册的撰写(基于Sphinx).
-- 5.29: ver 0.0.3 加入了Dataset和Dataloader，现在可以像PyTorch一样定义数据集和分割数据集，具体参考[data.py](/pydynet/data.py)中的`train_loader`函数；
-- 5.30: ver 0.0.3 将一维卷积算法退化成基于循环的im2col，新版本NumPy似乎不是很支持strided上数组的魔改；
-- 7.22: ver 0.0.4/0.05 增加了Module类和Parameter类，将模块重组、增加多种Pytorch支持的初始化方式；正在撰写新的Manual；
-- 7.28: ver 0.0.6 加入no_grad方法，可以像pytorch一样禁止自动微分，比如`@no_grad()`和`with no_grad()`，详见[autograd.py](/pydynet/autograd.py);
-- 8.09: ver 0.0.7 基于[cupy](https://cupy.dev/)，PyDyNet现在可以使用显卡加速训练，用法与PyTorch一致，详见[tests](./tests)中`cu*.py`；
-- 8.18: ver 0.0.8 加入学习率调整策略，实现了训练过程中自动调节学习率；
-- 10.21: ver 0.0.9 加入tensor的split方法，基于此改进了RNN；
-- 10.23: ver 0.0.10 重写RNN, LSTM和GRU，支持多层双向；
+**2024.8.12**: 实现了纯推理的llama3. 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
+```bash
+>>> python .\llama\llama.py
+There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
+Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick up the clothe and put them in the basket.
+But then, Timmy' mom saw him and said, "Timmy, you need to help me. You can't just put all the clothe in the basket all by yourself." Timmy felt sad because he
 
-</p>
-</details>
-
-**2024.6.29**: ver 0.1 增加了LayerNorm和Embedding; 修正了cuda训练的问题; 加入多个可复现测试: (MLP, LeNet, BN & Dropout, RNN, **Transformer**).
+Token count: 200, elapsed: 8.93s, 22 tokens/s
+```
 
 ## Overview
 
