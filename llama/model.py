@@ -1,21 +1,10 @@
-import sys, time, math, argparse
-
-sys.path.append('../pydynet')
-from tokenizer import Tokenizer
+import math
+import numpy as np
 
 import pydynet as pdn
 from pydynet.tensor import Tensor
 import pydynet.nn as nn
 import pydynet.nn.functional as F
-
-import numpy as np
-
-np.random.seed(42)
-try:
-    import cupy as cp
-    cp.random.seed(42)
-except:
-    print("Cupy is not installed!")
 
 
 def compute_cos_sin_cache(head_dim: int, max_seq_len: int, base: int = 10000):
@@ -216,81 +205,3 @@ class Llama(nn.Module):
             logits = self(inputs, pos)
             next_id = logits[:, -1, :].argmax(-1, True)
             yield next_id
-
-
-@pdn.no_grad()
-def load_model(llama: Llama, model_path: str):
-    weight = np.load(model_path)
-
-    llama.tok_embedding.weight.data[...] = weight['model.embed_tokens.weight']
-    llama.lm_head.weight.data[...] = weight['lm_head.weight'].T
-
-    for i in range(llama.n_layers):
-        (
-            llama.layers[i].attention.Q.weight.data[...],
-            llama.layers[i].attention.K.weight.data[...],
-            llama.layers[i].attention.V.weight.data[...],
-            llama.layers[i].attention.O.weight.data[...],
-            llama.layers[i].ffn.up.weight.data[...],
-            llama.layers[i].ffn.gate.weight.data[...],
-            llama.layers[i].ffn.down.weight[...],
-            llama.layers[i].input_norm.weight.data[...],
-            llama.layers[i].post_attn_norm.weight.data[...],
-        ) = (
-            weight[f'model.layers.{i}.self_attn.q_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.k_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.v_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.o_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.up_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.gate_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.down_proj.weight'].T,
-            weight[f'model.layers.{i}.input_layernorm.weight'],
-            weight[f'model.layers.{i}.post_attention_layernorm.weight'],
-        )
-
-        llama.norm.weight.data[...] = weight['model.norm.weight']
-
-    return llama
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Prompt input, e.g. There was a boy")
-    parser.add_argument("--prompt", type=str, default='There was a boy')
-    args = parser.parse_args()
-
-    dim: int = 288  # D
-    n_layers: int = 6
-    n_heads: int = 6
-    vocab_size: int = 32000  # VS
-    max_seq_len: int = 512  # M
-    max_new_tokens: int = 300
-    max_batch_size: int = 1
-
-    tokenizer = Tokenizer("llama/tokenizer.model.np")
-    model = load_model(
-        Llama(vocab_size, dim, n_heads, 768, max_seq_len, max_batch_size,
-              n_layers), "llama/stories15M.model.npz")
-
-    # If cuda is available
-    model = model.cuda()
-
-    model.eval()
-
-    print(f"\n{args.prompt}", end="")
-    input_ids = np.array([tokenizer.encode(args.prompt)])
-
-    start = time.time()
-    _, L = input_ids.shape
-    for id in model.generate(input_ids, max_new_tokens):
-        L += 1
-        output_id = id[0].numpy().tolist()
-
-        if output_id[-1] in [tokenizer.eos_id, tokenizer.bos_id]:
-            break
-        print(tokenizer.decode(output_id), end="")
-        sys.stdout.flush()
-    elapsed = time.time() - start
-    print(
-        f"\n\nToken count: {L}, elapsed: {elapsed:.2f}s, {round(L / elapsed)} tokens/s"
-    )
