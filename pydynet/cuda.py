@@ -1,13 +1,17 @@
 from typing import Any
 import numpy as np
+import warnings
 
 try:
     import cupy as cp
     cuda_available: bool = True
-except ImportError as e:
-    cp = object()
+except ModuleNotFoundError:
+    warnings.warn(
+        "Cupy is not installed. You can install it with:\n"
+        "  pip install cupy-cuda12x  # or appropriate version for your CUDA",
+        category=ImportWarning)
     cuda_available: bool = False
-    print(e)
+    cp = object()
 
 
 def is_available() -> bool:
