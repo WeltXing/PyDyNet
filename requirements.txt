@@ -1,9 +1,9 @@
 numpy
 
 # cuda训练所需要的，需要考虑显卡版本，参考https://docs.cupy.dev/en/stable/install.html
-cupy
+# cupy
 
 # 运行测试样例所需要的：
-scikit-learn
-matplotlib
-tqdm
+# scikit-learn
+# matplotlib
+# tqdm
