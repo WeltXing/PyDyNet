@@ -1,5 +1,5 @@
 from .activation import Sigmoid, Tanh, ReLU, LeakyReLU, Softmax
-from .norm import BatchNorm1d, BatchNorm2d, LayerNorm
+from .norm import BatchNorm1d, BatchNorm2d, LayerNorm, RMSNorm
 from .conv import Conv1d, Conv2d
 from .pool import MaxPool1d, MaxPool2d, AvgPool1d, AvgPool2d
 from .dropout import Dropout
@@ -17,6 +17,7 @@ __all__ = [
     "BatchNorm1d",
     "BatchNorm2d",
     "LayerNorm",
+    "RMSNorm",
     "Conv1d",
     "Conv2d",
     "MaxPool1d",

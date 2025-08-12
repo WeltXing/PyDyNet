@@ -1,6 +1,7 @@
 from .module import Module
 from ..parameter import Parameter
-from ...special import zeros, randn
+from .. import init
+from ...special import empty
 from ... import tensor
 from ...cuda import Device
 
@@ -26,7 +27,7 @@ class BatchNorm1d(Module):
     def __init__(
         self,
         num_features: int,
-        eps: float = 1e-5,
+        eps: float = 1e-6,
         momentum: float = 0.1,
         device=None,
         dtype=None,
@@ -37,15 +38,22 @@ class BatchNorm1d(Module):
         self.eps = eps
         self.momentum = momentum
         self.running_mean = Parameter(
-            zeros(self.num_features, **kwargs),
+            empty(self.num_features, **kwargs),
             requires_grad=False,
         )
         self.running_var = Parameter(
-            zeros(self.num_features, **kwargs),
+            empty(self.num_features, **kwargs),
             requires_grad=False,
         )
-        self.scale = Parameter(randn(self.num_features, **kwargs))
-        self.shift = Parameter(zeros(self.num_features, **kwargs))
+        self.scale = Parameter(empty(self.num_features, **kwargs))
+        self.shift = Parameter(empty(self.num_features, **kwargs))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.zeros_(self.running_mean)
+        init.zeros_(self.running_var)
+        init.kaiming_normal_(self.num_features)
+        init.zeros_(self.shift)
 
     def forward(self, x):
         if self._train:
@@ -93,7 +101,7 @@ class BatchNorm2d(Module):
     def __init__(
         self,
         num_features: int,
-        eps: float = 1e-5,
+        eps: float = 1e-6,
         momentum: float = 0.1,
         device=None,
         dtype=None,
@@ -104,15 +112,22 @@ class BatchNorm2d(Module):
         self.eps = eps
         self.momentum = momentum
         self.running_mean = Parameter(
-            zeros((1, self.num_features, 1, 1), **kwargs),
+            empty((1, self.num_features, 1, 1), **kwargs),
             requires_grad=False,
         )
         self.running_var = Parameter(
-            zeros((1, self.num_features, 1, 1), **kwargs),
+            empty((1, self.num_features, 1, 1), **kwargs),
             requires_grad=False,
         )
-        self.scale = Parameter(randn(1, self.num_features, 1, 1, **kwargs))
-        self.shift = Parameter(zeros((1, self.num_features, 1, 1), **kwargs))
+        self.scale = Parameter(empty(1, self.num_features, 1, 1, **kwargs))
+        self.shift = Parameter(empty((1, self.num_features, 1, 1), **kwargs))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.zeros_(self.running_mean)
+        init.zeros_(self.running_var)
+        init.kaiming_normal_(self.num_features)
+        init.zeros_(self.shift)
 
     def forward(self, x):
         if self._train:
@@ -156,7 +171,7 @@ class LayerNorm(Module):
     def __init__(
         self,
         normalized_shape: int,
-        eps: float = 1e-5,
+        eps: float = 1e-6,
         momentum: float = 0.1,
         device=None,
         dtype=None,
@@ -167,15 +182,22 @@ class LayerNorm(Module):
         self.eps = eps
         self.momentum = momentum
         self.running_mean = Parameter(
-            zeros(normalized_shape, **kwargs),
+            empty(normalized_shape, **kwargs),
             requires_grad=False,
         )
         self.running_var = Parameter(
-            zeros(normalized_shape, **kwargs),
+            empty(normalized_shape, **kwargs),
             requires_grad=False,
         )
-        self.scale = Parameter(randn(*normalized_shape, **kwargs))
-        self.shift = Parameter(zeros(normalized_shape, **kwargs))
+        self.scale = Parameter(empty(*normalized_shape, **kwargs))
+        self.shift = Parameter(empty(normalized_shape, **kwargs))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.zeros_(self.running_mean)
+        init.zeros_(self.running_var)
+        init.kaiming_normal_(self.num_features)
+        init.zeros_(self.shift)
 
     def forward(self, x):
         if self._train:
@@ -193,3 +215,33 @@ class LayerNorm(Module):
         else:
             return (x - self.running_mean) * self.scale / tensor.sqrt(
                 self.running_var + self.eps) + self.shift
+
+
+class RMSNorm(Module):
+
+    def __init__(
+        self,
+        normalized_shape: tuple,
+        eps: float = 1e-6,
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        kwargs = {"device": Device(device), "dtype": dtype}
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape, )
+        self.normalized_shape = tuple(normalized_shape)
+        self.sum_axis = tuple(
+            [-(i + 1) for i in range(len(self.normalized_shape))])
+        self.eps = eps
+
+        self.weight = Parameter(empty(self.normalized_shape, **kwargs))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.ones_(self.weight)
+
+    def forward(self, x):
+        z = tensor.square(x).mean(self.sum_axis, keepdims=True)
+        z = x / tensor.sqrt(z + self.eps)
+        return z * self.weight

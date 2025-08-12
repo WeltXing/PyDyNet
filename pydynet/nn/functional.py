@@ -65,6 +65,10 @@ def leaky_relu(x: tensor.Tensor, alpha: float):
     return tensor.maximum(x, alpha * x)
 
 
+def silu(x: tensor.Tensor):
+    return x / (1 + tensor.exp(-x))
+
+
 def softmax(x: tensor.Tensor, axis=None):
     '''Softmax函数'''
     x_sub_max = x - x.data.max()
