@@ -13,7 +13,7 @@
 
 ## Towards Large Language Model
 
-**2024.8.12**: 实现了纯推理的llama3. 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
+**2025.8.12**: 实现了纯推理的llama3. 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
 ```bash
 >>> python .\llama\llama.py
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
