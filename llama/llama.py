@@ -1,4 +1,4 @@
-import sys, time, math
+import sys, time, math, argparse
 
 sys.path.append('../pydynet')
 from tokenizer import Tokenizer
@@ -188,15 +188,15 @@ class Llama(nn.Module):
         L = input_ids.shape[-1]
         h = self.tok_embedding(input_ids)
 
-        freqs_cos = self.freqs_cos[start_pos:start_pos + L]
-        freqs_sin = self.freqs_sin[start_pos:start_pos + L]
+        freqs_cos = self.freqs_cos[start_pos:start_pos + L].to(h.device)
+        freqs_sin = self.freqs_sin[start_pos:start_pos + L].to(h.device)
 
         mask = None
         if L > 1:
             mask = np.full((L, L), float("-inf"))
             mask = np.triu(mask, k=1)
             mask = np.concatenate([np.zeros((L, start_pos)), mask], axis=1)
-            mask = pdn.Tensor(mask)
+            mask = pdn.Tensor(mask, device=h.device)
 
         for i, layer in enumerate(self.layers):
             h = layer(h, start_pos, mask, freqs_cos, freqs_sin)
@@ -254,24 +254,31 @@ def load_model(llama: Llama, model_path: str):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Prompt input, e.g. There was a boy")
+    parser.add_argument("--prompt", type=str, default='There was a boy')
+    args = parser.parse_args()
+
     dim: int = 288  # D
     n_layers: int = 6
     n_heads: int = 6
     vocab_size: int = 32000  # VS
-    max_seq_len: int = 200  # M
-    max_new_tokens: int = 200
+    max_seq_len: int = 512  # M
+    max_new_tokens: int = 300
     max_batch_size: int = 1
 
     tokenizer = Tokenizer("llama/tokenizer.model.np")
     model = load_model(
         Llama(vocab_size, dim, n_heads, 768, max_seq_len, max_batch_size,
               n_layers), "llama/stories15M.model.npz")
+
+    # If cuda is available
+    model = model.cuda()
+
     model.eval()
 
-    prompt = "There was a boy"
-
-    print(f"\n{prompt}", end="")
-    input_ids = np.array([tokenizer.encode(prompt)])
+    print(f"\n{args.prompt}", end="")
+    input_ids = np.array([tokenizer.encode(args.prompt)])
 
     start = time.time()
     _, L = input_ids.shape

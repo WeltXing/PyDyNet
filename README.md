@@ -18,9 +18,10 @@
 >>> python .\llama\llama.py
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
 Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick up the clothe and put them in the basket.
-But then, Timmy' mom saw him and said, "Timmy, you need to help me. You can't just put all the clothe in the basket all by yourself." Timmy felt sad because he
+But then, Timmy' mom saw him and said, "Timmy, you need to help me. You can't just put all the clothe in the basket all by yourself." Timmy felt sad because he wanted to help hi mom. But he knew he had to listen to her. So, he helped hi mom fold the clothe and put them away.
+After they finished, Timmy' mom said, "Thank you for helping me, Timmy. You did a great job!" Timmy felt happy that he could help hi mom and he learned that sometime it' important to do thing on your own.
 
-Token count: 200, elapsed: 8.93s, 22 tokens/s
+Token count: 286, elapsed: 5.39s, 53 tokens/s
 ```
 
 ## Overview
