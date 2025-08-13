@@ -530,9 +530,9 @@ class BinaryOperator(Tensor):
 
     def __init__(self, x: Tensor, y: Tensor) -> None:
         if not isinstance(x, Tensor) and isinstance(y, Tensor):
-            x = Tensor(x, device=y.device)
+            x = Tensor(x, dtype=y.dtype, device=y.device)
         elif isinstance(x, Tensor) and not isinstance(y, Tensor):
-            y = Tensor(y, device=x.device)
+            y = Tensor(y, dtype=x.dtype, device=x.device)
         elif not (isinstance(x, Tensor) and isinstance(y, Tensor)):
             x, y = Tensor(x), Tensor(y)
         assert x.device == y.device
