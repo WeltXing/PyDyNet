@@ -59,7 +59,8 @@ class Module:
         return self.train(False)
 
     def to(self, device):
-        device = Device(device)
+        if not isinstance(device, Device):
+            device = Device(device)
         if self.device != device:
             self.move(device)
         return self
@@ -73,8 +74,7 @@ class Module:
                 module.to(device)
 
     def cuda(self):
-        device = current_device()
-        return self.to(device)
+        return self.to(current_device())
 
     def cpu(self):
         return self.to('cpu')

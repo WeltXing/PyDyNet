@@ -1,4 +1,5 @@
 from typing import Any
+from functools import wraps
 import numpy as np
 import warnings
 
@@ -39,23 +40,31 @@ class Device:
         if isinstance(device, str):
             if device == "cpu":
                 self.device = "cpu"
-            elif device == "cuda":
+            elif device[:4] == "cuda":
                 self.device = "cuda"
-                self.device_id = current_device()
+                if len(device) == 4:
+                    device += ':0'
+
+                cuda_id = device.split(':')[-1]
+                if not cuda_id.isdigit():
+                    raise ValueError(f'Wrong cuda id \"{cuda_id}\"!')
+
+                self.device_id = int(cuda_id)
             else:
-                assert len(device) > 5 and device[:5] == "cuda:" and device[
-                    5:].isdigit()
-                self.device = "cuda"
-                self.device_id = int(device[5:])
+                raise ValueError(f"Unknown device \"{device}\"!")
+
         elif isinstance(device, int):
             self.device = "cuda"
             self.device_id = device
+
         elif device is None:
             self.device = "cpu"
+
         elif isinstance(device, Device):
             self.device = device.device
             if self.device != "cpu":
                 self.device_id = device.device_id
+
         if self.device == "cuda":
             self.device = cp.cuda.Device(self.device_id)
         assert self.device == "cpu" or is_available()

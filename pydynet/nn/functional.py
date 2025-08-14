@@ -1,14 +1,6 @@
 import numpy as np
-from typing import Tuple, Union
 
-from .. import tensor
-
-
-def size_handle(input: Union[int, Tuple[int, int]]):
-    if type(input) is int:
-        return input, input
-    assert type(input) in {list, tuple} and len(input) == 2
-    return input
+from .. import tensor, unsqueeze
 
 
 def linear(x: tensor.Tensor, weight: tensor.Tensor, bias: tensor.Tensor):
@@ -22,11 +14,7 @@ def embedding(x: tensor.Tensor, weight: tensor.Tensor, padding_idx: int):
     query = weight[x]
     if padding_idx is not None:
         with tensor.no_grad():
-            mask = tensor.Tensor(
-                weight.xp.expand_dims(x.data != padding_idx, -1),
-                dtype=float,
-                device=weight.device,
-            )
+            mask = unsqueeze(x != padding_idx, -1)
         query = query * mask
     return query
 
@@ -34,8 +22,8 @@ def embedding(x: tensor.Tensor, weight: tensor.Tensor, padding_idx: int):
 class sigmoid(tensor.UnaryOperator):
     '''Sigmoid运算, 我们前向传播避免了溢出问题'''
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
-        sigmoid = self.xp.zeros(x.shape)
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
+        sigmoid = self.xp.zeros(x.shape, dtype=self.dtype)
         sigmoid[x.data > 0] = 1 / (1 + self.xp.exp(-x.data[x.data > 0]))
         sigmoid[x.data <= 0] = 1 - 1 / (1 + self.xp.exp(x.data[x.data <= 0]))
         return sigmoid
@@ -47,7 +35,7 @@ class sigmoid(tensor.UnaryOperator):
 class tanh(tensor.UnaryOperator):
     '''Tanh运算, 我们前向传播避免了溢出问题'''
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
         tanh = self.xp.zeros(x.shape)
         tanh[x.data > 0] = 2 / (1 + self.xp.exp(-2 * x.data[x.data > 0])) - 1
         tanh[x.data <= 0] = 1 - 2 / (1 + self.xp.exp(2 * x.data[x.data <= 0]))
@@ -71,14 +59,14 @@ def silu(x: tensor.Tensor):
 
 def softmax(x: tensor.Tensor, axis=None):
     '''Softmax函数'''
-    x_sub_max = x - x.data.max()
+    x_sub_max = x - x.max().item()
     exp_ = tensor.exp(x_sub_max)
     return exp_ / tensor.sum(exp_, axis=axis, keepdims=True)
 
 
 def log_softmax(x: tensor.Tensor, axis=None, keepdims=False):
     '''log-softmax函数'''
-    x_sub_max = x - x.data.max()
+    x_sub_max = x - x.max().item()
     return x_sub_max - tensor.log(
         tensor.sum(tensor.exp(x_sub_max), axis=axis, keepdims=keepdims))
 
@@ -97,7 +85,7 @@ class __im2col1d(tensor.UnaryOperator):
         self.n_output = (self.n_features - self.kernel_size) // stride + 1
         super().__init__(x)
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
         col = self.xp.zeros(
             (self.N, self.in_channels, self.n_output, self.kernel_size))
 
@@ -122,7 +110,7 @@ class __pad1d(tensor.UnaryOperator):
         self.pad_width = pad_width
         super().__init__(x)
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
         return self.xp.pad(x.data, [(0, 0), (0, 0),
                                     (self.pad_width, self.pad_width)],
                            'constant')
@@ -228,7 +216,7 @@ class __im2col2d(tensor.UnaryOperator):
                 self.n_w - self.kernel_size) // self.stride + 1
         super().__init__(x)
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
         col = self.xp.zeros((self.N, self.in_channels, self.kernel_size,
                              self.kernel_size, self.out_h, self.out_w))
         for i in range(self.kernel_size):
@@ -258,7 +246,7 @@ class __pad2d(tensor.UnaryOperator):
         self.pad_width = pad_width
         super().__init__(x)
 
-    def forward(self, x: tensor.Tensor) -> np.ndarray:
+    def forward_(self, x: tensor.Tensor) -> np.ndarray:
         return self.xp.pad(x.data, [(0, 0), (0, 0),
                                     (self.pad_width, self.pad_width),
                                     (self.pad_width, self.pad_width)],
@@ -383,7 +371,7 @@ def nll_loss(y_pred, y_true, reduction='mean'):
 
 def cross_entropy_loss(y_pred, y_true, reduction='mean'):
     '''交叉熵损失'''
-    update_y_pred = y_pred - y_pred.data.max()
+    update_y_pred = y_pred - y_pred.max().item()
     log_sum_exp = tensor.log(
         tensor.sum(tensor.exp(update_y_pred), 1, keepdims=True))
 

@@ -1,4 +1,3 @@
-from typing import Any, List, Tuple, Union
 import numpy as np
 from .cuda import Device
 from .autograd import is_grad_enable, no_grad
@@ -74,10 +73,10 @@ class Tensor:
 
     def __init__(
         self,
-        data: Any,
+        data,
         dtype=None,
-        device: Union[Device, int, str, None] = None,
-        requires_grad: bool = False,
+        device: Device | int | str | None = None,
+        requires_grad: bool = False
     ) -> None:
         if isinstance(data, Tensor):
             data = data.data
@@ -90,16 +89,16 @@ class Tensor:
             self.data = self.xp.array(data, dtype)
 
         self.requires_grad: bool = requires_grad and is_grad_enable()
-        if self.requires_grad and not np.issubdtype(self.dtype, np.floating):
-            raise TypeError(
-                "Only Tensors of floating point dtype can require gradients!")
-        self.grad = self.xp.zeros(self.shape) if self.requires_grad else None
-
-        self.last: List[Tensor] = list()
-
         if self.requires_grad:
-            # 不需要求梯度的节点不出现在动态计算图中
+            if not np.issubdtype(self.dtype, np.floating):
+                raise TypeError(
+                    "Only Tensors of floating point dtype can require gradients!"
+                )
+            self.grad = self.xp.zeros(self.shape, dtype=dtype)
+            self.last: list[Tensor] = list()
             Graph.add_node(self)
+        else:
+            self.grad = None
 
     @property
     def is_leaf(self) -> bool:
@@ -107,7 +106,7 @@ class Tensor:
         return not self.requires_grad or len(self.last) == 0
 
     @property
-    def shape(self) -> Tuple[int]:
+    def shape(self) -> tuple[int]:
         '''张量的形状, 用法同NumPy.
         
         Example
@@ -131,7 +130,7 @@ class Tensor:
         return self.data.ndim
 
     @property
-    def dtype(self):
+    def dtype(self) -> np.dtype:
         '''张量的数据类型, 用法同NumPy.
 
         Example
@@ -173,58 +172,38 @@ class Tensor:
     def swapaxes(self, axis1: int, axis2: int):
         return swapaxes(self, axis1, axis2)
 
-    def vsplit(self, indices_or_sections: Union[int, Tuple]):
+    def vsplit(self, indices_or_sections: int | tuple):
         return vsplit(self, indices_or_sections)
 
-    def hsplit(self, indices_or_sections: Union[int, Tuple]):
+    def hsplit(self, indices_or_sections: int | tuple):
         return hsplit(self, indices_or_sections)
 
-    def dsplit(self, indices_or_sections: Union[int, Tuple]):
+    def dsplit(self, indices_or_sections: int | tuple):
         return dsplit(self, indices_or_sections)
 
-    def split(self, indices_or_sections: Union[int, Tuple], axis=0):
-        return split(self, indices_or_sections, axis=0)
+    def split(self, indices_or_sections: int | tuple, axis=0):
+        return split(self, indices_or_sections, axis=axis)
 
-    def max(
-        self,
-        axis: Union[int, Tuple, None] = None,
-        keepdims: bool = False,
-    ):
+    def max(self, axis: int | tuple | None = None, keepdims: bool = False):
         return max(self, axis, keepdims)
 
-    def min(
-        self,
-        axis: Union[int, Tuple, None] = None,
-        keepdims: bool = False,
-    ):
+    def min(self, axis: int | tuple | None = None, keepdims: bool = False):
         return min(self, axis, keepdims)
 
-    def mean(
-        self,
-        axis: Union[int, Tuple, None] = None,
-        keepdims: bool = False,
-    ):
+    def mean(self, axis: int | tuple | None = None, keepdims: bool = False):
         return mean(self, axis, keepdims)
 
-    def sum(
-        self,
-        axis: Union[int, Tuple, None] = None,
-        keepdims: bool = False,
-    ):
+    def sum(self, axis: int | tuple | None = None, keepdims: bool = False):
         return sum(self, axis, keepdims)
 
-    def argmax(self,
-               axis: Union[int, Tuple, None] = None,
-               keepdims: bool = False):
+    def argmax(self, axis: int | tuple | None = None, keepdims: bool = False):
         return argmax(self, axis, keepdims)
 
-    def argmin(self,
-               axis: Union[int, Tuple, None] = None,
-               keepdims: bool = False):
+    def argmin(self, axis: int | tuple | None = None, keepdims: bool = False):
         return argmin(self, axis, keepdims)
 
     def build_edge(self, node):
-        '''构建两节点的有向边, 正常不适用'''
+        '''构建节点的有向边, 正常不适用'''
         node.last.append(self)
 
     def __repr__(self) -> str:
@@ -304,95 +283,68 @@ class Tensor:
                 "In-place operation is forbidden in node requires grad.")
         if isinstance(key, Tensor):
             key = key.data
-        if not isinstance(value, Tensor):
-            self.data[key] = value
-        else:
-            self.data[key] = value.data
+
+        with self.device:
+            self.data[key] = value.data if isinstance(value, Tensor) else value
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __iadd__(self, other):
+    def __inplace(self, other, func):
         if self.requires_grad:
             raise ValueError(
                 "In-place operation is forbidden in node requires grad.")
         if isinstance(other, Tensor):
             other = other.data
-        self.data += other
+        with self.device:
+            self.data[...] = func(self.data, other)
         return self
+
+    def __iadd__(self, other):
+        return self.__inplace(other, lambda x, y: x + y)
 
     def __isub__(self, other):
-        if self.requires_grad:
-            raise ValueError(
-                "In-place operation is forbidden in node requires grad.")
-        if isinstance(other, Tensor):
-            other = other.data
-        self.data -= other
-        return self
+        return self.__inplace(other, lambda x, y: x - y)
 
     def __imul__(self, other):
-        if self.requires_grad:
-            raise ValueError(
-                "In-place operation is forbidden in node requires grad.")
-        if isinstance(other, Tensor):
-            other = other.data
-        self.data *= other
-        return self
+        return self.__inplace(other, lambda x, y: x * y)
 
     def __itruediv__(self, other):
-        if self.requires_grad:
-            raise ValueError(
-                "In-place operation is forbidden in node requires grad.")
-        if isinstance(other, Tensor):
-            other = other.data
-        self.data /= other
-        return self
+        return self.__inplace(other, lambda x, y: x / y)
 
     def __imatmul__(self, other):
-        if self.requires_grad:
-            raise ValueError(
-                "In-place operation is forbidden in node requires grad.")
+        return self.__inplace(other, lambda x, y: x @ y)
+
+    def __compare(self, other, func):
         if isinstance(other, Tensor):
             other = other.data
-        self.data @= other
-        return self
+
+        with self.device:
+            return Tensor(func(self.data, other), self.xp.bool_, self.device)
 
     @no_grad()
     def __lt__(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data < other, device=self.device)
+        return self.__compare(other, lambda x, y: x < y)
 
     @no_grad()
     def __le__(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data <= other, device=self.device)
-
-    # 这里没有重载__eq__和__neq__是因为在RNN中这样的重载会引发问题
-    @no_grad()
-    def eq(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data == other, device=self.device)
+        return self.__compare(other, lambda x, y: x <= y)
 
     @no_grad()
-    def neq(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data != other, device=self.device)
+    def __eq__(self, other):
+        return self.__compare(other, lambda x, y: x == y)
+
+    @no_grad()
+    def __neq__(self, other):
+        return not self.__eq__(other)
 
     @no_grad()
     def __gt__(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data > other, device=self.device)
+        return not self.__le__(other)
 
     @no_grad()
     def __ge__(self, other):
-        if isinstance(other, Tensor):
-            other = other.data
-        return Tensor(self.data >= other, device=self.device)
+        return not self.__lt__(other)
 
     def backward(self, retain_graph: bool = False):
         '''
@@ -431,7 +383,7 @@ class Tensor:
 
     def zero_grad(self):
         '''梯度归零'''
-        self.grad = self.xp.zeros(self.shape)
+        self.grad[...] = 0
 
     def numpy(self) -> np.ndarray:
         '''返回Tensor的内部数据, 即NumPy数组(拷贝)'''
@@ -450,7 +402,8 @@ class Tensor:
                 self.data = self.data.get()
             else:  # cpu -> cuda
                 import cupy as cp
-                self.data = cp.asarray(self.data)
+                with device:
+                    self.data = cp.asarray(self.data)
             self.device = device
         return self
 
@@ -493,6 +446,10 @@ class UnaryOperator(Tensor):
             x.build_edge(self)
 
     def forward(self, x: Tensor) -> np.ndarray:
+        with self.device:
+            return self.forward_(x)
+
+    def forward_(self, x: Tensor) -> np.ndarray:
         '''前向传播函数, 参数为Tensor, 返回的是NumPy数组'''
         raise NotImplementedError
 
@@ -529,6 +486,7 @@ class BinaryOperator(Tensor):
     '''
 
     def __init__(self, x: Tensor, y: Tensor) -> None:
+        # A strict type-cast: follow the Tensor
         if not isinstance(x, Tensor) and isinstance(y, Tensor):
             x = Tensor(x, dtype=y.dtype, device=y.device)
         elif isinstance(x, Tensor) and not isinstance(y, Tensor):
@@ -536,6 +494,8 @@ class BinaryOperator(Tensor):
         elif not (isinstance(x, Tensor) and isinstance(y, Tensor)):
             x, y = Tensor(x), Tensor(y)
         assert x.device == y.device
+        # if x.device != 'cpu':
+        #     assert x.data.device.id == y.data.device.id
         self.device = x.device
         super().__init__(
             data=self.forward(x, y),
@@ -548,7 +508,10 @@ class BinaryOperator(Tensor):
             y.build_edge(self)
 
     def forward(self, x: Tensor, y: Tensor) -> np.ndarray:
-        '''前向传播函数, 参数为Tensor, 返回的是NumPy数组'''
+        with self.device:
+            return self.forward_(x, y)
+
+    def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         raise NotImplementedError
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -579,7 +542,7 @@ class add(BinaryOperator):
     >>> z = x + y
     '''
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward_(self, x: Tensor, y: Tensor):
         return x.data + y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray):
@@ -595,7 +558,7 @@ class sub(BinaryOperator):
     add : 加法算子
     '''
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward_(self, x: Tensor, y: Tensor):
         return x.data - y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray):
@@ -622,7 +585,7 @@ class mul(BinaryOperator):
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward_(self, x: Tensor, y: Tensor):
         return x.data * y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray):
@@ -643,7 +606,7 @@ class div(BinaryOperator):
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward_(self, x: Tensor, y: Tensor):
         return x.data / y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray):
@@ -665,7 +628,7 @@ class pow(BinaryOperator):
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward_(self, x: Tensor, y: Tensor):
         return x.data**y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -689,7 +652,7 @@ class matmul(BinaryOperator):
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
-    def forward(self, x: Tensor, y: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         self.expand_a, self.expand_b = x.ndim < 2, y.ndim < 2
         return x.data @ y.data
 
@@ -724,11 +687,11 @@ class abs(UnaryOperator):
     add : 加法算子
     '''
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.abs(x.data)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        mask = self.xp.zeros(x.shape)
+        mask = self.xp.zeros(x.shape, dtype=x.dtype)
         mask[x.data > 0] = 1.
         mask[x.data < 0] = -1.
         return grad * mask
@@ -762,13 +725,13 @@ class sum(UnaryOperator):
         self.keepdims = keepdims
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.sum(x.data, axis=self.axis, keepdims=self.keepdims)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
         if not (self.axis is None or self.keepdims):
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return self.xp.ones(x.shape) * grad
+        return self.xp.ones(x.shape, dtype=x.dtype) * grad
 
 
 class mean(UnaryOperator):
@@ -792,13 +755,14 @@ class mean(UnaryOperator):
         self.keepdims = keepdims
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.mean(x.data, axis=self.axis, keepdims=self.keepdims)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
         if not (self.axis is None or self.keepdims):
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return self.xp.ones(x.shape) * grad * self.data.size / x.data.size
+        return self.xp.ones(
+            x.shape, dtype=x.dtype) * grad * self.data.size / x.data.size
 
 
 class max(UnaryOperator):
@@ -822,7 +786,7 @@ class max(UnaryOperator):
         self.keepdims = keepdims
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.max(x.data, axis=self.axis, keepdims=self.keepdims)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -832,7 +796,7 @@ class max(UnaryOperator):
             # 还原维度
             full_dim_y = self.xp.expand_dims(self.data, axis=self.axis)
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return (full_dim_y == x.data).astype(float) * grad
+        return (full_dim_y == x.data).astype(x.dtype) * grad
 
 
 class min(UnaryOperator):
@@ -856,7 +820,7 @@ class min(UnaryOperator):
         self.keepdims = keepdims
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.min(x.data, axis=self.axis, keepdims=self.keepdims)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -866,7 +830,7 @@ class min(UnaryOperator):
             # 还原维度
             full_dim_y = self.xp.expand_dims(self.data, axis=self.axis)
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return (full_dim_y == x.data).astype(float) * grad
+        return (full_dim_y == x.data).astype(x.dtype) * grad
 
 
 class argmax(Tensor):
@@ -880,7 +844,12 @@ class argmax(Tensor):
         super().__init__(self.forward(x), device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
-        return self.xp.argmax(x.data, axis=self.axis, keepdims=self.keepdims)
+        with self.device:
+            return self.xp.argmax(
+                x.data,
+                axis=self.axis,
+                keepdims=self.keepdims,
+            )
 
 
 class argmin(Tensor):
@@ -894,7 +863,12 @@ class argmin(Tensor):
         super().__init__(self.forward(x), device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
-        return self.xp.argmin(x.data, axis=self.axis, keepdims=self.keepdims)
+        with self.device:
+            return self.xp.argmin(
+                x.data,
+                axis=self.axis,
+                keepdims=self.keepdims,
+            )
 
 
 class exp(UnaryOperator):
@@ -906,7 +880,7 @@ class exp(UnaryOperator):
     >>> y = exp(x)
     '''
 
-    def forward(self, x: Tensor):
+    def forward_(self, x: Tensor):
         return self.xp.exp(x.data)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -922,7 +896,7 @@ class log(UnaryOperator):
     >>> y = log(x)
     '''
 
-    def forward(self, x: Tensor):
+    def forward_(self, x: Tensor):
         return self.xp.log(x.data)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -931,7 +905,7 @@ class log(UnaryOperator):
 
 class maximum(BinaryOperator):
 
-    def forward(self, x: Tensor, y: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         return self.xp.maximum(x.data, y.data)
 
     def grad_fn(self, x: Tensor, grad) -> np.ndarray:
@@ -940,21 +914,11 @@ class maximum(BinaryOperator):
 
 class minimum(BinaryOperator):
 
-    def forward(self, x: Tensor, y: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         return self.xp.minimum(x, y)
 
     def grad_fn(self, x: Tensor, grad) -> np.ndarray:
         return (self.data == x) * grad
-
-
-def sqrt(x: Tensor):
-    '''平方根函数'''
-    return x**0.5
-
-
-def square(x: Tensor):
-    '''平方函数'''
-    return x * x
 
 
 # 非计算函数
@@ -972,7 +936,7 @@ class reshape(UnaryOperator):
         self.new_shape = new_shape
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return x.data.reshape(self.new_shape)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -993,7 +957,7 @@ class transpose(UnaryOperator):
         self.axes = axes
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return x.data.transpose(self.axes)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -1019,7 +983,7 @@ class swapaxes(UnaryOperator):
         self.axis2 = axis2
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return x.data.swapaxes(self.axis1, self.axis2)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
@@ -1056,11 +1020,11 @@ class get_slice(UnaryOperator):
             self.key = key
         super().__init__(x)
 
-    def forward(self, x: Tensor) -> np.ndarray:
+    def forward_(self, x: Tensor) -> np.ndarray:
         return x.data[self.key]
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        full_grad = self.xp.zeros(x.shape)
+        full_grad = self.xp.zeros(x.shape, dtype=x.dtype)
         full_grad[self.key] = grad
         return full_grad
 
@@ -1076,7 +1040,7 @@ class concat(Tensor):
         连接轴, 默认是沿着第一个轴拼接.
     '''
 
-    def __init__(self, tensors: List[Tensor], axis=0) -> None:
+    def __init__(self, tensors: list[Tensor], axis=0) -> None:
         requires_grad = False
         self.tensors = tensors
         self.axis = axis
@@ -1102,8 +1066,9 @@ class concat(Tensor):
                 self.tensors[i].build_edge(self)
 
     def forward(self):
-        return self.xp.concatenate([t.data for t in self.tensors],
-                                   axis=self.axis)
+        with self.device:
+            return self.xp.concatenate([t.data for t in self.tensors],
+                                       axis=self.axis)
 
     def grad_fn(self, x, grad: np.ndarray):
         x_id = self.tensors.index(x)
@@ -1114,10 +1079,17 @@ class concat(Tensor):
         return grad[tuple(slc)]
 
 
-def vsplit(
-    x: Tensor,
-    indices_or_sections: Union[int, Tuple],
-) -> List[Tensor]:
+def sqrt(x: Tensor):
+    '''平方根函数'''
+    return x**0.5
+
+
+def square(x: Tensor):
+    '''平方函数'''
+    return x * x
+
+
+def vsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
     if not isinstance(x, Tensor):
         x = Tensor(x)
 
@@ -1153,10 +1125,7 @@ def vsplit(
     return sub_tensors
 
 
-def hsplit(
-    x: Tensor,
-    indices_or_sections: Union[int, Tuple],
-) -> List[Tensor]:
+def hsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
     if not isinstance(x, Tensor):
         x = Tensor(x)
 
@@ -1192,10 +1161,7 @@ def hsplit(
     return sub_tensors
 
 
-def dsplit(
-    x: Tensor,
-    indices_or_sections: Union[int, Tuple],
-) -> List[Tensor]:
+def dsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
     if not isinstance(x, Tensor):
         x = Tensor(x)
 
@@ -1233,9 +1199,9 @@ def dsplit(
 
 def split(
     x: Tensor,
-    indices_or_sections: Union[int, Tuple],
+    indices_or_sections: int | tuple,
     axis: int = 0,
-) -> List[Tensor]:
+) -> list[Tensor]:
     if not isinstance(x, Tensor):
         x = Tensor(x)
 
@@ -1278,9 +1244,10 @@ def split(
     return sub_tensors
 
 
-def unsqueeze(x: Tensor, axis: Any):
+def unsqueeze(x: Tensor, axis):
     '''等价于numpy的expand_dims, 因此我们借用了expand_dims的源码'''
     from numpy.core.numeric import normalize_axis_tuple
+
     if type(axis) not in (tuple, list):
         axis = (axis, )
 
