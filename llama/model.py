@@ -6,14 +6,15 @@ from pydynet.tensor import Tensor
 import pydynet.nn as nn
 import pydynet.nn.functional as F
 
-DTYPE = np.float32
 
-
-def compute_cos_sin_cache(head_dim: int, max_seq_len: int, base: int = 10000):
+def compute_cos_sin_cache(head_dim: int,
+                          max_seq_len: int,
+                          base: int = 10000,
+                          dtype=None):
     inv_freq = 1.0 / (base**(np.arange(0, head_dim, 2)[:(head_dim // 2)] /
                              head_dim))
     t = np.arange(max_seq_len)
-    freqs = np.outer(t, inv_freq).astype(DTYPE)
+    freqs = np.outer(t, inv_freq).astype(dtype)
 
     return Tensor(np.cos(freqs)), Tensor(np.sin(freqs))
 
@@ -44,12 +45,12 @@ def apply_rotary_emb(xq: Tensor, xk: Tensor, freqs_cos, freqs_sin):
 
 class FeedForward(nn.Module):
 
-    def __init__(self, dim, up_dim):
+    def __init__(self, dim, up_dim, dtype=None):
         super().__init__()
         self.dim, self.up_dim = dim, up_dim
-        self.up = nn.Linear(dim, up_dim, bias=False, dtype=DTYPE)
-        self.gate = nn.Linear(dim, up_dim, bias=False, dtype=DTYPE)
-        self.down = nn.Linear(up_dim, dim, bias=False, dtype=DTYPE)
+        self.up = nn.Linear(dim, up_dim, bias=False, dtype=dtype)
+        self.gate = nn.Linear(dim, up_dim, bias=False, dtype=dtype)
+        self.down = nn.Linear(up_dim, dim, bias=False, dtype=dtype)
 
     def forward(self, x):
         swish, x_V = F.silu(self.gate(x)), self.up(x)
@@ -58,11 +59,14 @@ class FeedForward(nn.Module):
 
 class Attention(nn.Module):
 
-    def __init__(self,
-                 dim: int,
-                 n_heads: int,
-                 max_seq_len: int,
-                 max_batch_size: int = None):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        max_seq_len: int,
+        max_batch_size: int = None,
+        dtype=None,
+    ):
         super().__init__()
         self.dim = dim
         self.n_heads = n_heads
@@ -70,26 +74,25 @@ class Attention(nn.Module):
         assert dim % n_heads == 0
         self.head_dim = dim // n_heads
 
-        self.Q = nn.Linear(self.dim, self.dim, bias=False, dtype=DTYPE)
-        self.K = nn.Linear(self.dim, self.dim, bias=False, dtype=DTYPE)
-        self.V = nn.Linear(self.dim, self.dim, bias=False, dtype=DTYPE)
-        self.O = nn.Linear(self.dim, self.dim, bias=False, dtype=DTYPE)
+        self.Q = nn.Linear(self.dim, self.dim, bias=False, dtype=dtype)
+        self.K = nn.Linear(self.dim, self.dim, bias=False, dtype=dtype)
+        self.V = nn.Linear(self.dim, self.dim, bias=False, dtype=dtype)
+        self.O = nn.Linear(self.dim, self.dim, bias=False, dtype=dtype)
 
         self.max_seq_len = max_seq_len
         self.max_batch_size = max_batch_size if max_batch_size is not None else 1
 
-        self.cache_k = nn.Parameter(
-            pdn.special.zeros((self.max_batch_size, max_seq_len, self.n_heads,
-                               self.head_dim),
-                              dtype=DTYPE))
-        self.cache_v = nn.Parameter(
-            pdn.special.zeros((self.max_batch_size, max_seq_len, self.n_heads,
-                               self.head_dim),
-                              dtype=DTYPE))
+        self.cache_k = nn.Parameter(pdn.special.zeros(
+            (self.max_batch_size, max_seq_len, self.n_heads, self.head_dim),
+            dtype=dtype),
+                                    requires_grad=False)
+        self.cache_v = nn.Parameter(pdn.special.zeros(
+            (self.max_batch_size, max_seq_len, self.n_heads, self.head_dim),
+            dtype=dtype),
+                                    requires_grad=False)
 
     def __call__(self, x, start_pos: int, mask, freqs_cos, freqs_sin):
         B, L, _ = x.shape
-
         xq, xk, xv = (
             self.Q(x).reshape(B, L, self.n_heads, self.head_dim),
             self.K(x).reshape(B, L, self.n_heads, self.head_dim),
@@ -119,17 +122,21 @@ class Attention(nn.Module):
 
 class TransformerBlock(nn.Module):
 
-    def __init__(self,
-                 dim: int,
-                 n_heads: int,
-                 ffn_dim: int,
-                 max_seq_len: int,
-                 max_batch_size: int = None):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        ffn_dim: int,
+        max_seq_len: int,
+        max_batch_size: int = None,
+        dtype=None,
+    ):
         super().__init__()
-        self.attention = Attention(dim, n_heads, max_seq_len, max_batch_size)
-        self.ffn = FeedForward(dim, ffn_dim)
-        self.input_norm = nn.RMSNorm(dim, dtype=DTYPE)
-        self.post_attn_norm = nn.RMSNorm(dim, dtype=DTYPE)
+        self.attention = Attention(dim, n_heads, max_seq_len, max_batch_size,
+                                   dtype)
+        self.ffn = FeedForward(dim, ffn_dim, dtype)
+        self.input_norm = nn.RMSNorm(dim, dtype=dtype)
+        self.post_attn_norm = nn.RMSNorm(dim, dtype=dtype)
 
     def forward(self, x, start_pos: int, mask, freqs_cos, freqs_sin):
         norm_x = self.input_norm(x)
@@ -153,6 +160,7 @@ class Llama(nn.Module):
         max_seq_len: int,
         max_batch_size: int = None,
         n_layers: int = 6,
+        dtype=None,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -163,17 +171,20 @@ class Llama(nn.Module):
         self.max_batch_size = max_batch_size
         self.n_layers = n_layers
 
-        self.tok_embedding = nn.Embedding(vocab_size, embed_dim, dtype=DTYPE)
-        self.freqs_cos, self.freqs_sin = compute_cos_sin_cache(
-            embed_dim // n_heads, max_seq_len)
+        self.tok_embedding = nn.Embedding(vocab_size, embed_dim, dtype=dtype)
+        self.freqs_cos, self.freqs_sin = compute_cos_sin_cache(embed_dim //
+                                                               n_heads,
+                                                               max_seq_len,
+                                                               dtype=dtype)
 
         self.layers = nn.ModuleList([
             TransformerBlock(embed_dim, n_heads, ffn_dim, max_seq_len,
-                             max_batch_size) for _ in range(self.n_layers)
+                             max_batch_size, dtype)
+            for _ in range(self.n_layers)
         ])
 
-        self.norm = nn.RMSNorm(embed_dim, dtype=DTYPE)
-        self.lm_head = nn.Linear(embed_dim, vocab_size, dtype=DTYPE)
+        self.norm = nn.RMSNorm(embed_dim, dtype=dtype)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, dtype=dtype)
 
     def forward(self, input_ids, start_pos: int):
         L = input_ids.shape[-1]
@@ -186,7 +197,7 @@ class Llama(nn.Module):
         if L > 1:
             mask = np.triu(np.full((L, L), float("-inf")), k=1)
             mask = np.concatenate([np.zeros((L, start_pos)), mask], axis=1)
-            mask = pdn.Tensor(mask, device=h.device, dtype=DTYPE)
+            mask = pdn.Tensor(mask, device=h.device, dtype=h.dtype)
 
         for layer in self.layers:
             h = layer(h, start_pos, mask, freqs_cos, freqs_sin)
