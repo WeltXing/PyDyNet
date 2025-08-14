@@ -1,6 +1,6 @@
 import numpy as np
 
-from .. import tensor, unsqueeze
+from .. import tensor, unsqueeze, no_grad
 
 
 def linear(x: tensor.Tensor, weight: tensor.Tensor, bias: tensor.Tensor):
@@ -59,14 +59,18 @@ def silu(x: tensor.Tensor):
 
 def softmax(x: tensor.Tensor, axis=None):
     '''Softmax函数'''
-    x_sub_max = x - x.max().item()
+    with no_grad():
+        max_ = x.max(axis, keepdims=True)
+    x_sub_max = x - max_
     exp_ = tensor.exp(x_sub_max)
     return exp_ / tensor.sum(exp_, axis=axis, keepdims=True)
 
 
 def log_softmax(x: tensor.Tensor, axis=None, keepdims=False):
     '''log-softmax函数'''
-    x_sub_max = x - x.max().item()
+    with no_grad():
+        max_ = x.max(axis, keepdims=True)
+    x_sub_max = x - max_
     return x_sub_max - tensor.log(
         tensor.sum(tensor.exp(x_sub_max), axis=axis, keepdims=keepdims))
 
