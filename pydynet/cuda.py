@@ -66,6 +66,9 @@ class Device:
                 self.device_id = device.device_id
 
         if self.device == "cuda":
+            if not is_available():
+                raise RuntimeError(
+                    "Cuda device is not supported on this system.")
             self.device = cp.cuda.Device(self.device_id)
         assert self.device == "cpu" or is_available()
 

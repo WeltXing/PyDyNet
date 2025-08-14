@@ -83,7 +83,7 @@ class Tensor:
 
         self.device = Device(device)
         with self.device:
-            self.data = self.xp.asarray(data, dtype)
+            self.data = self.xp.array(data, dtype)
 
         self.requires_grad = is_grad_enable() and requires_grad
         if self.requires_grad:
@@ -329,14 +329,6 @@ class Tensor:
         return self.__compare(other, lambda x, y: x <= y)
 
     @no_grad()
-    def __eq__(self, other):
-        return self.__compare(other, lambda x, y: x == y)
-
-    @no_grad()
-    def __neq__(self, other):
-        return not self.__eq__(other)
-
-    @no_grad()
     def __gt__(self, other):
         return not self.__le__(other)
 
@@ -364,7 +356,8 @@ class Tensor:
         5.
         '''
         if self not in Graph.node_list:
-            raise ValueError("AD failed because the node is not in graph.")
+            raise ValueError(
+                "Auto-grad is failed because current node is not in graph.")
 
         if self.size > 1:
             raise ValueError("backward should be called only on a scalar.")

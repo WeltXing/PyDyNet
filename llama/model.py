@@ -201,31 +201,8 @@ class Llama(nn.Module):
             mask = np.concatenate([np.zeros((L, start_pos)), mask], axis=1)
             mask = pdn.Tensor(mask, device=h.device, dtype=h.dtype)
 
-        # from cupyx.profiler import benchmark
-
-        # print(
-        #     "\n",
-        #     benchmark(lambda h: self.layers[0]
-        #               (h, start_pos, mask, freqs_cos, freqs_sin), (h, ),
-        #               n_repeat=20))
-        # assert 0
-
-        # import cProfile, pstats
-        # import cupy as cp
-
-        # profiler = cProfile.Profile()
-        # profiler.enable()
-
-        # cp.cuda.Stream.null.synchronize()  # 确保干净开始
         for layer in self.layers:
             h = layer(h, start_pos, mask, freqs_cos, freqs_sin)
-
-        # cp.cuda.Stream.null.synchronize()
-        # profiler.disable()
-
-        # stats = pstats.Stats(profiler).sort_stats("tottime")
-        # stats.print_callers(15)
-        # stats.print_stats(10)  # 打印前10个耗时最多的函数
 
         logit = self.lm_head(self.norm(h)[:, [-1], :])
         return logit
