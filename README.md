@@ -17,11 +17,10 @@
 ```bash
 >>> python .\llama\infer.py
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
-Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick up the clothe and put them in the basket.
-But then, Timmy' mom saw him and said, "Timmy, you need to help me. You can't just put all the clothe in the basket all by yourself." Timmy felt sad because he wanted to help hi mom. But he knew he had to listen to her. So, he helped hi mom fold the clothe and put them away.
-After they finished, Timmy' mom said, "Thank you for helping me, Timmy. You did a great job!" Timmy felt happy that he could help hi mom and he learned that sometime it' important to do thing on your own.
+Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the laundry, Timmy saw a big pile of clothe on the ground. He wanted to play with them, but he knew he had to help hi mom.
+After they finished folding the laundry, Timmy' mom said, "Thank you for helping me, Timmy. You did a great job!" Timmy felt proud of himself for helping hi mom and he realized that sometime it' important to help out, even if it mean doing something you don't want to do.
 
-Token count: 286, elapsed: 5.39s, 53 tokens/s
+Token count: 223, elapsed: 0.99s, 225 tokens/s
 ```
 
 ## Overview
@@ -219,18 +218,18 @@ python setup.py install
 
 [autodiff1d.py](tests/autodiff1d.py)利用自动微分，对一个一维凸函数进行梯度下降：
 
-<img src="src/ad1d.png" alt="ad1" style="zoom:67%;" />
+<img src="img/ad1d.png" alt="ad1" style="zoom:67%;" />
 
 以及一个多元凸函数的例子: [autodiff2d.py](tests/autodiff2d.py)
 
-<img src="src/ad2d.png" alt="ad2" style="zoom:67%;" />
+<img src="img/ad2d.png" alt="ad2" style="zoom:67%;" />
 
 
 ### MLP & LeNet
 
 [mlp_cnn.py](tests/mlp_cnn.py)使用全连接网络(三层+残差)和LeNet对MNIST进行分类. 训练准确率和测试准确率：
 
-<img src="src/mlp_cnn.png" alt="dnn" style="zoom:67%;" />
+<img src="img/mlp_cnn.png" alt="dnn" style="zoom:67%;" />
 
 ### Dropout & BN
 
@@ -242,19 +241,19 @@ python setup.py install
 
 学习效果对比：
 
-<img src="src/dropout_BN.png" alt="cnn" style="zoom:67%;" />
+<img src="img/dropout_BN.png" alt="cnn" style="zoom:67%;" />
 
 ### RNN
 
 [rnn_sin.py](tests/rnn_sin.py)中是一个用RNN从$x=\sin(z)$学习$y=\cos(2z)$例子. 最后的训练结果:
 
-<img src="src/RNN.png" alt="RNN" style="zoom:67%;" />
+<img src="img/RNN.png" alt="RNN" style="zoom:67%;" />
 
 ### Transformer
 
 [transformer.py](tests/transformer.py)中是一个用Transformer训练文本分类模型的例子. 训练结果:
 
-<img src="src/transformer.png" alt="transformer" style="zoom:67%;" />
+<img src="img/transformer.png" alt="transformer" style="zoom:67%;" />
 
 > 数据集 (CoLA) 链接: <https://nyu-mll.github.io/CoLA/cola_public_1.1.zip>
 

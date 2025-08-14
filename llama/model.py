@@ -172,10 +172,12 @@ class Llama(nn.Module):
         self.n_layers = n_layers
 
         self.tok_embedding = nn.Embedding(vocab_size, embed_dim, dtype=dtype)
-        self.freqs_cos, self.freqs_sin = compute_cos_sin_cache(embed_dim //
-                                                               n_heads,
-                                                               max_seq_len,
-                                                               dtype=dtype)
+        freqs_cos, freqs_sin = compute_cos_sin_cache(embed_dim // n_heads,
+                                                     max_seq_len,
+                                                     dtype=dtype)
+
+        self.freqs_cos = nn.parameter.Parameter(freqs_cos, False)
+        self.freqs_sin = nn.parameter.Parameter(freqs_sin, False)
 
         self.layers = nn.ModuleList([
             TransformerBlock(embed_dim, n_heads, ffn_dim, max_seq_len,
@@ -190,8 +192,8 @@ class Llama(nn.Module):
         L = input_ids.shape[-1]
         h = self.tok_embedding(input_ids)
 
-        freqs_cos = self.freqs_cos[start_pos:start_pos + L].to(h.device)
-        freqs_sin = self.freqs_sin[start_pos:start_pos + L].to(h.device)
+        freqs_cos = self.freqs_cos[start_pos:start_pos + L]
+        freqs_sin = self.freqs_sin[start_pos:start_pos + L]
 
         mask = None
         if L > 1:
@@ -199,8 +201,31 @@ class Llama(nn.Module):
             mask = np.concatenate([np.zeros((L, start_pos)), mask], axis=1)
             mask = pdn.Tensor(mask, device=h.device, dtype=h.dtype)
 
+        # from cupyx.profiler import benchmark
+
+        # print(
+        #     "\n",
+        #     benchmark(lambda h: self.layers[0]
+        #               (h, start_pos, mask, freqs_cos, freqs_sin), (h, ),
+        #               n_repeat=20))
+        # assert 0
+
+        # import cProfile, pstats
+        # import cupy as cp
+
+        # profiler = cProfile.Profile()
+        # profiler.enable()
+
+        # cp.cuda.Stream.null.synchronize()  # 确保干净开始
         for layer in self.layers:
             h = layer(h, start_pos, mask, freqs_cos, freqs_sin)
+
+        # cp.cuda.Stream.null.synchronize()
+        # profiler.disable()
+
+        # stats = pstats.Stats(profiler).sort_stats("tottime")
+        # stats.print_callers(15)
+        # stats.print_stats(10)  # 打印前10个耗时最多的函数
 
         logit = self.lm_head(self.norm(h)[:, [-1], :])
         return logit

@@ -76,21 +76,18 @@ class Tensor:
         data,
         dtype=None,
         device: Device | int | str | None = None,
-        requires_grad: bool = False
+        requires_grad: bool = False,
     ) -> None:
         if isinstance(data, Tensor):
-            data = data.data
+            assert 0
 
-        if not isinstance(device, Device):
-            device = Device(device)
-
-        self.device: Device = device
+        self.device = Device(device)
         with self.device:
-            self.data = self.xp.array(data, dtype)
+            self.data = self.xp.asarray(data, dtype)
 
-        self.requires_grad: bool = requires_grad and is_grad_enable()
+        self.requires_grad = is_grad_enable() and requires_grad
         if self.requires_grad:
-            if not np.issubdtype(self.dtype, np.floating):
+            if not self.xp.issubdtype(self.dtype, np.floating):
                 raise TypeError(
                     "Only Tensors of floating point dtype can require gradients!"
                 )
@@ -159,8 +156,9 @@ class Tensor:
 
     def astype(self, new_type):
         '''类型转换, 我们不允许可求导节点的类型转换'''
-        assert not self.requires_grad
-        self.data = self.data.astype(new_type)
+        with self.device:
+            self.data = self.data.astype(new_type)
+            self.dtype = self.data.dtype
         return self
 
     def reshape(self, *new_shape):
@@ -398,20 +396,16 @@ class Tensor:
     def to(self, device):
         device = Device(device)
         if self.device != device:
-            if device.device == "cpu":  # cuda -> cpu
-                self.data = self.data.get()
-            else:  # cpu -> cuda
-                import cupy as cp
-                with device:
-                    self.data = cp.asarray(self.data)
             self.device = device
+            with device:
+                self.data = self.xp.asarray(self.data)
         return self
 
     def cpu(self):
         return self.to("cpu")
 
     def cuda(self):
-        return self.to("cuda")
+        return self.to("cuda:0")
 
     @property
     def xp(self):
@@ -439,7 +433,7 @@ class UnaryOperator(Tensor):
         self.device = x.device
         super().__init__(
             data=self.forward(x),
-            device=x.device,
+            device=self.device,
             requires_grad=is_grad_enable() and x.requires_grad,
         )
         if self.requires_grad:
