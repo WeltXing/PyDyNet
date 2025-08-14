@@ -13,14 +13,14 @@
 
 ## Towards Large Language Model
 
-**2025.8.12**: 实现了纯推理的llama3. 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
+**2025.8.12**: 实现了纯推理的llama3 (6-layer Transformer, vocab-size=32000). 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
 ```bash
 >>> python .\llama\infer.py
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
-Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the laundry, Timmy saw a big pile of clothe on the ground. He wanted to play with them, but he knew he had to help hi mom.
-After they finished folding the laundry, Timmy' mom said, "Thank you for helping me, Timmy. You did a great job!" Timmy felt proud of himself for helping hi mom and he realized that sometime it' important to help out, even if it mean doing something you don't want to do.
+Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick it up. But then, he accidentally knocked over a pile of clothe and they fell on him. Timmy wa okay, but he felt bad.
+Hi mom saw what happened and said, "Timmy, you need to be more careful. You could have hurt yourself." Timmy felt bad and said sorry. Hi mom hugged him and said, "It' okay, accident happen. Let' clean up the laundry together." Timmy learned that it' important to be careful and help out when you need it.
 
-Token count: 223, elapsed: 0.99s, 225 tokens/s
+Token count: 262, elapsed: 0.87s, 300 tokens/s
 ```
 
 ## Overview
@@ -28,173 +28,20 @@ Token count: 223, elapsed: 0.99s, 225 tokens/s
 PyDyNet也是纯NumPy(0.0.7版本后加入CuPy，其用法和NumPy一致)实现的神经网络，语法受PyTorch的启发，大致结构如下：
 
 ```mermaid
-graph BT
-   N(numpy/cupy.ndarray) ----> ds(Dataset) ----> Data(DataLoader)--> Mission
-   N --> A(Tensor) --Eager execution--> B(Basic operators: add, exp, etc)
+graph LR
+   N(numpy/cupy.ndarray)--Backend--> A(Tensor) --> ds(Dataset) ---> Data(DataLoader)---> Mission
+   A  --Eager execution--> B(Basic operators:<br> add, exp, etc)
    B -.Autograd-.-> A
-   B --> CO(Complex operators:softmax,etc)
-   --> f(Function:linear, conv2d, etc) 
-   --> M(Basic Module:Linear,Conv2d,etc)
-   --> CM(Advanced Module:CNN,RNN,Transformer,...)
-   --> Mission(PyDyNet)
-   N --> GD(Optimizer:SGD, Adam, etc) ----> LS(lr_scheduler:StepLR, etc)--> Mission
+
+   B --> CO(Complex<br>operators)
+   --> f(Function:<br>img2col, etc) 
+   --> M(Basic Module:<br>Linear, etc)
+   --> CM(Advanced Module: CNN, RNN, Transformer, etc)
+   --> Mission(Learning task)
+   A --> GD(Optimizer:<br> SGD, Adam, etc) ---> LS(lr_scheduler: <br>StepLR, etc)---> Mission
 ```
 
-虚线表示用户可以通过`no_grad`来关闭自动微分功能. 我们实现了：
-
-1. 将NumPy数组包装成具有梯度等信息的张量(Tensor):
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   from pydynet import Tensor
-
-   x = Tensor(1., requires_grad=True)
-   print(x.data) # 1.
-   print(x.ndim, x.shape, x.is_leaf) # 0, (), True
-   ```
-   </p>
-   </details>
-
-2. 将NumPy数组的计算(包括数学运算、切片、形状变换等)抽象成基础算子(Basic operators)，并对部分运算加以重载：
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   import pydynet as pdn
-
-   x = pdn.Tensor([1, 2, 3])
-   y = pdn.exp(x) + x
-   z = pdn.sum(x)
-   print(z.data) # 36.192...
-   ```
-   </p>
-   </details>
-
-3. 手动编写基础算子的梯度，实现和PyTorch相同的动态图自动微分机制(Autograd)，从而实现反向传播
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   import pydynet as pdn
-   from pydynet import Tensor
-
-   x = Tensor([1., 2., 3.], requires_grad=True)
-   y = pdn.log(x) + x
-   z = pdn.sum(y)
-
-   z.backward()
-   print(x.grad) # [2., 1.5, 1.33333333]
-   ```
-   </p>
-   </details>
-
-4. 基于基础算子实现更高级的算子(Complex operators)，它们不再需要手动编写导数：
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   import pydynet as pdn
-
-   def simple_sigmoid(x: pdn.Tensor):
-       return 1 / (1 + pdn.exp(-x))
-   ```
-   </p>
-   </details>
-
-5. 实现了Mudule，包括激活函数，损失函数等，从而我们可以像下面这样定义神经网络，损失函数项：
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   import pydynet.nn as nn
-   import pydynet.nn.functional as F
-
-   n_input = 64
-   n_hidden = 128
-   n_output = 10
-
-   class Net(nn.Module):
-       def __init__(self) -> None:
-           super().__init__()
-           self.fc1 = nn.Linear(n_input, n_hidden)
-           self.fc2 = nn.Linear(n_hidden, n_output)
-
-       def forward(self, x):
-           x = self.fc1(x)
-           x = F.sigmoid(x)
-           return self.fc2(x)
-
-   net = Net()
-   loss = nn.CrossEntropyLoss()
-   l = loss(net(X), y)
-   l.backward()
-   ```
-   </p>
-   </details>
-
-6. 实现了多种优化器和学习率衰减策略，从而实现神经网络的训练；其中优化器和PyTorch一样支持权值衰减，即正则化：
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   from pydynet.optim import Adam, StepLR
-
-   ...
-   net = Net()
-   optimizer = Adam(net.parameters(), lr=0.01)
-   lr_scheduler = StepLR(optimizer, step_size=10)
-
-   for epoch in range(EPOCHES):
-       for data in data_loader:
-           train(...)
-           optimizer.step()
-       lr_scheduler.step()
-   ```
-   </p>
-   </details>
-7. 实现了Dataset和DataLoader对数据集进行加载与划分：
-   <details><summary>Example</summary>
-   <p>
-
-   ```python
-   from pydynet.data import Dataset, DataLoader
-   
-   class TrainSet(Dataset):
-       def __init__(self, X, y) -> None:
-           self.data = X
-           self.target = y
-
-       def __getitem__(self, index):
-           return self.data[index], self.target[index]
-
-       def __len__(self):
-           return len(self.data)
-
-    data_loader = DataLoader(TrainSet(X, y), batch_size, shuffle)
-   ```
-   </p>
-   </details>
-8. Dropout机制，Batch Normalization机制，以及将网络划分成训练阶段和评估阶段；
-9. 基于im2col高效实现Conv1d, Conv2d, max_pool1d和max_pool2d，从而实现CNN；
-10. 支持多层的**多层双向**RNN，LSTM和GRU；
-11. 多种初始化方式，包括Kaiming和Xavier；
-12. 基于cupy实现了显卡计算和训练：
-    <details><summary>Example</summary>
-    <p>
-
-    ```python
-    from pydynet import Tensor
-       
-    x = Tensor([1., 2., 3.], device='cuda')
-    y = Tensor([1., 2., 3.], device='cuda')
-    z = (x * y).sum()
-
-    w = Tensor([1., 2., 3.]) # CPU上的Tensor
-    x * w # 报错
-    ```
-    </p>
-    </details>
+虚线表示用户可以通过`no_grad`来关闭自动微分功能.
 
 ## Install
 
