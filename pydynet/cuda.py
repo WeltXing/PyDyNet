@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     warnings.warn(
         "Cupy is not installed. You can install it with:\n"
         "  pip install cupy-cuda12x  # or appropriate version for your CUDA",
-        category=ImportWarning)
+        category=UserWarning)
     cuda_available: bool = False
     cp = object()
 

@@ -1,12 +1,15 @@
-import sys
+import sys, warnings
 
 sys.path.append('../pydynet')
 
 import numpy as np
-try:
-    import cupy as cp
-except:
-    print("Cupy is not installed!")
+# try:
+#     import cupy as cp
+# except ModuleNotFoundError:
+#     warnings.warn(
+#         "Cupy is not installed. You can install it with:\n"
+#         "  pip install cupy-cuda12x  # or appropriate version for your CUDA",
+#         category=UserWarning)
 
 import gzip
 from os.path import join
@@ -15,7 +18,7 @@ from tqdm import tqdm
 import pydynet as pdn
 import pydynet.nn as nn
 import pydynet.nn.functional as F
-from pydynet.optim import Adam
+from pydynet.optim import Adam, SGD
 from pydynet.data import data_loader
 
 from warnings import filterwarnings
@@ -84,10 +87,10 @@ class ResidualMLP(nn.Module):
         super().__init__()
         self.layer1 = nn.Sequential(
             Flatten(),
-            nn.Linear(28 * 28, 1024),
+            nn.Linear(28 * 28, 1024, dtype=np.float32),
         )
-        self.layer2 = nn.Linear(1024, 1024)
-        self.layer3 = nn.Linear(1024, 10)
+        self.layer2 = nn.Linear(1024, 1024, dtype=np.float32)
+        self.layer3 = nn.Linear(1024, 10, dtype=np.float32)
 
     def forward(self, x):
         z1 = F.relu(self.layer1(x))
@@ -99,10 +102,10 @@ class ConvNet(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 20, 3, 1)
-        self.conv2 = nn.Conv2d(20, 50, 3, 1)
-        self.fc1 = nn.Linear(7 * 7 * 50, 500)
-        self.fc2 = nn.Linear(500, 10)
+        self.conv1 = nn.Conv2d(1, 20, 3, 1, dtype=np.float32)
+        self.conv2 = nn.Conv2d(20, 50, 3, 1, dtype=np.float32)
+        self.fc1 = nn.Linear(7 * 7 * 50, 500, dtype=np.float32)
+        self.fc2 = nn.Linear(500, 10, dtype=np.float32)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -115,21 +118,22 @@ class ConvNet(nn.Module):
 
 
 if __name__ == "__main__":
-    LR = 5e-3
+    LR = 1e-4
     EPOCHES = 50
     TRAIN_BATCH_SIZE = 128
     TEST_BATCH_SIZE = 512
     use_cuda = True
 
+    np.random.seed(42)
+
     device = 'cuda' if pdn.cuda.is_available() and use_cuda else 'cpu'
 
-    # net = ResidualMLP().to(device)
     net = ConvNet().to(device)
     print(net)
 
     optimizer = Adam(net.parameters(), lr=LR)
 
-    dataset = MNISTDataset(r'./data/MNIST/raw')
+    dataset = MNISTDataset(r'./examples/data/MNIST/raw')
     train_loader = data_loader(
         *dataset.load_train(),
         shuffle=True,
@@ -173,10 +177,9 @@ if __name__ == "__main__":
                 test_size += batch_X.shape[0]
 
         train_acc, test_acc = train_right / train_size, test_right / test_size
-        bar.set_postfix(
-            TEST_ACC="{:.4f}".format(test_acc),
-            TRAIN_ACC="{:.4f}".format(train_acc),
-        )
+        bar.set_postfix(TEST_ACC="{:.4f}".format(test_acc),
+                        TRAIN_ACC="{:.4f}".format(train_acc),
+                        LOSS="{:.6f}".format(loss.item()))
         info_list.append([train_acc.item(), test_acc.item()])
 
     print(np.array(info_list))

@@ -46,10 +46,12 @@ class Tensor:
     ----------
     data : ndarray
         张量数据, 只要是np.array能够转换的数据;
-    requires_grad : bool, default=False
-        是否需要求梯度;
     dtype : default=None
         数据类型, 和numpy数组的dtype等价
+    copy : bool, default=False
+        是否拷贝数据
+    requires_grad : bool, default=False
+        是否需要求梯度;
 
     Attributes
     ----------
@@ -75,15 +77,18 @@ class Tensor:
         self,
         data,
         dtype=None,
+        copy: bool = True,
         device: Device | int | str | None = None,
         requires_grad: bool = False,
     ) -> None:
         if isinstance(data, Tensor):
             assert 0
 
+        self.copy = copy
         self.device = Device(device)
         with self.device:
-            self.data = self.xp.array(data, dtype)
+            self.data = self.xp.array(data, dtype=dtype, copy=self.copy)
+            # self.data = self.xp.asarray(data, dtype=dtype)
 
         self.requires_grad = is_grad_enable() and requires_grad
         if self.requires_grad:
@@ -149,6 +154,10 @@ class Tensor:
         2
         '''
         return self.data.size
+
+    @property
+    def strides(self) -> tuple[int]:
+        return self.data.strides
 
     @property
     def T(self):
@@ -362,7 +371,7 @@ class Tensor:
         if self.size > 1:
             raise ValueError("backward should be called only on a scalar.")
 
-        self.grad = self.xp.ones(self.shape)
+        self.grad = self.xp.ones(self.shape, dtype=self.dtype)
         y_id = Graph.size - Graph.node_list[::-1].index(self) - 1
         for node in Graph.node_list[y_id::-1]:
             for last in node.last:
@@ -424,9 +433,12 @@ class UnaryOperator(Tensor):
         if not isinstance(x, Tensor):
             x = Tensor(x)
         self.device = x.device
+        data = self.forward(x)
         super().__init__(
-            data=self.forward(x),
+            data=data,
             device=self.device,
+            copy=None,
+            dtype=data.dtype,
             requires_grad=is_grad_enable() and x.requires_grad,
         )
         if self.requires_grad:
@@ -484,9 +496,13 @@ class BinaryOperator(Tensor):
         # if x.device != 'cpu':
         #     assert x.data.device.id == y.data.device.id
         self.device = x.device
+        data = self.forward(x, y)
+
         super().__init__(
-            data=self.forward(x, y),
+            data=data,
+            copy=None,
             device=x.device,
+            dtype=data.dtype,
             requires_grad=is_grad_enable()
             and (x.requires_grad or y.requires_grad),
         )
@@ -629,7 +645,7 @@ class matmul(BinaryOperator):
     '''
     矩阵乘法算子, 在Tensor类中进行重载, 张量的矩阵乘法遵从NumPy Matmul的规则.
 
-    参考 : https://welts.xyz/2022/04/26/broadcast/
+    参考 : https://xingcy.net/2022/04/26/broadcast/
 
     See also
     --------
@@ -828,7 +844,7 @@ class argmax(Tensor):
         self.axis = axis
         self.keepdims = keepdims
         self.device = x.device
-        super().__init__(self.forward(x), device=self.device)
+        super().__init__(self.forward(x), copy=False, device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
         with self.device:
@@ -847,7 +863,7 @@ class argmin(Tensor):
         self.axis = axis
         self.keepdims = keepdims
         self.device = x.device
-        super().__init__(self.forward(x), device=self.device)
+        super().__init__(self.forward(x), copy=False, device=self.device)
 
     def forward(self, x: Tensor) -> np.ndarray:
         with self.device:
@@ -1045,9 +1061,12 @@ class concat(Tensor):
             self.indices.append(self.indices[-1] +
                                 self.tensors[i].shape[self.axis])
         self.device = device
-        super().__init__(self.forward(),
-                         requires_grad=requires_grad and is_grad_enable(),
-                         device=device)
+        super().__init__(
+            self.forward(),
+            requires_grad=requires_grad and is_grad_enable(),
+            copy=False,
+            device=self.device,
+        )
         if self.requires_grad:
             for i in range(len(self.tensors)):
                 self.tensors[i].build_edge(self)

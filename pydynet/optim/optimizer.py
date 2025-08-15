@@ -7,19 +7,18 @@
 Reference
 ---------
 论文: https://arxiv.org/abs/1609.04747;\n
-博客: https://welts.xyz/2021/08/20/gd/.
+博客: https://xingcy.net/2021/08/20/gd/.
 '''
 
 from math import sqrt
-from typing import List, Tuple
 from ..tensor import Tensor
 
 
 class Optimizer:
     '''优化器基类'''
 
-    def __init__(self, params: List[Tensor]) -> None:
-        self.params: List[Tensor] = list(params)
+    def __init__(self, params: list[Tensor]) -> None:
+        self.params: list[Tensor] = list(params)
 
     def step(self):
         raise NotImplementedError
@@ -35,7 +34,7 @@ class SGD(Optimizer):
 
     Parameters
     ----------
-    params : List[Parameter]
+    params : list[Parameter]
         待优化参数;
     lr : float
         学习率;
@@ -49,7 +48,7 @@ class SGD(Optimizer):
 
     def __init__(
         self,
-        params: List[Tensor],
+        params: list[Tensor],
         lr: float,
         momentum: float = 0.,
         weight_decay: float = 0.,
@@ -60,7 +59,10 @@ class SGD(Optimizer):
         self.momentum = momentum
         self.weight_decay = weight_decay
         self.nesterov = nesterov
-        self.v = [param.xp.zeros(param.shape) for param in self.params]
+        self.v = [
+            param.xp.zeros(param.shape, dtype=param.dtype)
+            for param in self.params
+        ]
 
     def step(self):
         for i in range(len(self.params)):
@@ -77,7 +79,7 @@ class Adagrad(Optimizer):
     
     Parameters
     ----------
-    params : List[Parameter]
+    params : list[Parameter]
         待优化参数;
     lr : float, default=1e-2.
         学习率;
@@ -89,7 +91,7 @@ class Adagrad(Optimizer):
 
     def __init__(
         self,
-        params: List[Tensor],
+        params: list[Tensor],
         lr: float = 1e-2,
         weight_decay: float = 0,
         eps: float = 1e-10,
@@ -98,7 +100,10 @@ class Adagrad(Optimizer):
         self.lr = lr
         self.weight_decay = weight_decay
         self.eps = eps
-        self.G = [param.xp.zeros(param.shape) for param in self.params]
+        self.G = [
+            param.xp.zeros(param.shape, dtype=param.dtype)
+            for param in self.params
+        ]
 
     def step(self):
         for i in range(len(self.params)):
@@ -111,7 +116,7 @@ class Adadelta(Optimizer):
     '''
     Adadelta优化器
     
-    params : List[Parameter]
+    params : list[Parameter]
         待优化参数;
     lr : float, default=1e-2.
         学习率;
@@ -124,7 +129,7 @@ class Adadelta(Optimizer):
 
     def __init__(
         self,
-        params: List[Tensor],
+        params: list[Tensor],
         lr: float = 1.0,
         rho: float = 0.9,
         weight_decay: float = 0,
@@ -136,7 +141,10 @@ class Adadelta(Optimizer):
         self.eps = eps
         self.eps = eps
         self.weight_decay = weight_decay
-        self.G = [param.xp.zeros(param.shape) for param in self.params]
+        self.G = [
+            param.xp.zeros(param.shape, dtype=param.dtype)
+            for param in self.params
+        ]
 
     def step(self):
         for i in range(len(self.params)):
@@ -150,9 +158,9 @@ class Adam(Optimizer):
 
     def __init__(
         self,
-        params: List[Tensor],
+        params: list[Tensor],
         lr: float = 1e-3,
-        betas: Tuple[float] = (0.9, 0.999),
+        betas: tuple[float] = (0.9, 0.999),
         eps: float = 1e-8,
         weight_decay: float = 0,
     ) -> None:
@@ -161,15 +169,23 @@ class Adam(Optimizer):
         self.beta1, self.beta2 = betas
         self.eps = eps
         self.weight_decay = weight_decay
-        self.m = [param.xp.zeros(param.shape) for param in self.params]
-        self.v = [param.xp.zeros(param.shape) for param in self.params]
+        self.m = [
+            param.xp.zeros(param.shape, dtype=param.dtype)
+            for param in self.params
+        ]
+        self.v = [
+            param.xp.zeros(param.shape, dtype=param.dtype)
+            for param in self.params
+        ]
         self.t = 1
 
     def step(self):
         for i in range(len(self.params)):
             grad = self.params[i].grad + self.weight_decay * self.params[i].data
-            self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * grad
-            self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * grad**2
+            self.m[i] *= self.beta1
+            self.m[i] += (1 - self.beta1) * grad
+            self.v[i] *= self.beta2
+            self.v[i] += (1 - self.beta2) * grad**2
             a_t = sqrt(1 - self.beta2**self.t) / (1 - self.beta1**self.t)
             self.params[i].data -= self.lr * a_t * self.m[i] / (
                 self.v[i]**0.5 + self.eps)

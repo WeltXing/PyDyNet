@@ -23,7 +23,7 @@ class sigmoid(tensor.UnaryOperator):
     '''Sigmoid运算, 我们前向传播避免了溢出问题'''
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        sigmoid = self.xp.zeros(x.shape, dtype=self.dtype)
+        sigmoid = self.xp.zeros(x.shape, dtype=x.dtype)
         sigmoid[x.data > 0] = 1 / (1 + self.xp.exp(-x.data[x.data > 0]))
         sigmoid[x.data <= 0] = 1 - 1 / (1 + self.xp.exp(x.data[x.data <= 0]))
         return sigmoid
@@ -90,21 +90,25 @@ class __im2col1d(tensor.UnaryOperator):
         super().__init__(x)
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        col = self.xp.zeros(
-            (self.N, self.in_channels, self.n_output, self.kernel_size))
+        s0, s1, s2 = x.strides
+        shape = (x.shape[0], self.in_channels, self.kernel_size, self.n_output)
+        self.__strides = (s0, s1, s2, s2 * self.stride)
 
-        for i in range(self.kernel_size):
-            i_max = i + self.n_output * self.stride
-            col[..., i] = x.data[..., i:i_max:self.stride]
-
+        col = self.xp.lib.stride_tricks.as_strided(
+            x.data,
+            shape=shape,
+            strides=self.__strides,
+        ).copy()
         return col
 
     def grad_fn(self, x: tensor.Tensor, grad: np.ndarray) -> np.ndarray:
-        grad_x = self.xp.zeros((self.N, self.in_channels, self.n_features))
-        for i in range(self.kernel_size):
-            i_max = i + self.n_output * self.stride
-            grad_x[..., i:i_max:self.stride] += grad[..., i]
-
+        grad_x = self.xp.zeros(x.shape, dtype=self.dtype)
+        view = self.xp.lib.stride_tricks.as_strided(
+            grad_x,
+            shape=self.shape,
+            strides=self.__strides,
+        )
+        np.add.at(view, (..., ), grad)
         return grad_x
 
 
@@ -212,35 +216,56 @@ class __im2col2d(tensor.UnaryOperator):
         kernel_size: int,
         stride: int,
     ) -> None:
-        self.N, self.in_channels, self.n_h, self.n_w = x.shape
+        _, self.in_channels, self.n_h, self.n_w = x.shape
         self.kernel_size = kernel_size
         self.stride = stride
         self.out_h, self.out_w = (
             self.n_h - self.kernel_size) // self.stride + 1, (
                 self.n_w - self.kernel_size) // self.stride + 1
+
         super().__init__(x)
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        col = self.xp.zeros((self.N, self.in_channels, self.kernel_size,
-                             self.kernel_size, self.out_h, self.out_w))
-        for i in range(self.kernel_size):
-            i_max = i + self.out_h * self.stride
-            for j in range(self.kernel_size):
-                j_max = j + self.out_w * self.stride
-                col[:, :, i, j, :, :] = x.data[:, :, i:i_max:self.stride,
-                                               j:j_max:self.stride]
+        # standard
+        # col = self.xp.empty((self.N, self.in_channels, self.kernel_size,
+        #                      self.kernel_size, self.out_h, self.out_w),
+        #                     dtype=x.dtype)
 
+        # for i in range(self.kernel_size):
+        #     i_max = i + self.out_h * self.stride
+        #     for j in range(self.kernel_size):
+        #         j_max = j + self.out_w * self.stride
+        #         col[:, :, i, j] = x.data[:, :, i:i_max:self.stride,
+        #                                  j:j_max:self.stride]
+
+        s0, s1, s2, s3 = x.strides
+        shape = (x.shape[0], self.in_channels, self.kernel_size,
+                 self.kernel_size, self.out_h, self.out_w)
+        self.__strides = (s0, s1, s2, s3, s2 * self.stride, s3 * self.stride)
+
+        col = self.xp.lib.stride_tricks.as_strided(
+            x.data,
+            shape=shape,
+            strides=self.__strides,
+        ).copy()
         return col
 
     def grad_fn(self, x: tensor.Tensor, grad: np.ndarray) -> np.ndarray:
-        grad_col = grad
-        grad_x = self.xp.zeros((self.N, self.in_channels, self.n_h, self.n_w))
-        for i in range(self.kernel_size):
-            i_max = i + self.out_h * self.stride
-            for j in range(self.kernel_size):
-                j_max = j + self.out_w * self.stride
-                grad_x[:, :, i:i_max:self.stride,
-                       j:j_max:self.stride] = grad_col[:, :, i, j, :, :]
+        grad_x = self.xp.zeros(x.shape, dtype=self.dtype)
+        # standard
+        # for i in range(self.kernel_size):
+        #     i_max = i + self.out_h * self.stride
+        #     for j in range(self.kernel_size):
+        #         j_max = j + self.out_w * self.stride
+        #         grad_x[:, :, i:i_max:self.stride,
+        #                j:j_max:self.stride] += grad[:, :, i, j]
+
+        view = self.xp.lib.stride_tricks.as_strided(
+            grad_x,
+            shape=self.shape,
+            strides=self.__strides,
+        )
+        np.add.at(view, (..., ), grad)
         return grad_x
 
 
