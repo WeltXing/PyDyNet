@@ -86,7 +86,7 @@ python setup.py install
 
 ### RNN
 
-[rnn_sin.py](examples/rnn_sin.py)中是一个用RNN从$x=\sin(z)$学习$y=\cos(2z)$例子. 最后的训练结果:
+[rnn_sin.py](examples/rnn_sin.py)中是一个用GRU从$x=\sin(z)$学习$y=\sin(\sin(x)+0.4\cos(3x))$例子. 最后的训练结果:
 
 <img src="imgs/RNN.png" alt="RNN" style="zoom:67%;" />
 
