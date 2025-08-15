@@ -36,7 +36,7 @@ class tanh(tensor.UnaryOperator):
     '''Tanh运算, 我们前向传播避免了溢出问题'''
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        tanh = self.xp.zeros(x.shape)
+        tanh = self.xp.zeros(x.shape, dtype=x.dtype)
         tanh[x.data > 0] = 2 / (1 + self.xp.exp(-2 * x.data[x.data > 0])) - 1
         tanh[x.data <= 0] = 1 - 2 / (1 + self.xp.exp(2 * x.data[x.data <= 0]))
         return tanh

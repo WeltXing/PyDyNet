@@ -150,10 +150,8 @@ class RNN(Module):
             h_list = self.cell_forward(self.RNNCells[0], x, h[0])
             hr_list = self.cell_forward(self.rRNNCells[0], x[::-1], h[1])
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])],
                 axis=-1,
             )
             hn = tensor.concat([h_list[-1], hr_list[-1]])
@@ -187,12 +185,8 @@ class RNN(Module):
                 hn_list.append(h_list[-1])
                 hrn_list.append(hr_list[-1])
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
-                axis=-1,
-            )
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])], axis=-1)
             hn = tensor.concat(hn_list + hrn_list)
 
         if self.batch_first and x.ndim == 3:
@@ -409,12 +403,8 @@ class LSTM(Module):
                 (h[1], c[1]),
             )
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
-                axis=-1,
-            )
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])], axis=-1)
             hn = tensor.concat([h_list[-1], hr_list[-1]])
             cn = tensor.concat([c_list[-1], cr_list[-1]])
         elif self.num_layers > 1 and not self.bidirectional:
@@ -449,12 +439,8 @@ class LSTM(Module):
                 cn_list.append(c_list[-1])
                 crn_list.append(cr_list[-1])
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
-                axis=-1,
-            )
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])], axis=-1)
             hn = tensor.concat(hn_list + hrn_list)
             cn = tensor.concat(cn_list + crn_list)
         if self.batch_first and x.ndim == 3:
@@ -657,12 +643,8 @@ class GRU(Module):
             h_list = self.cell_forward(self.GRUCells[0], x, h[0])
             hr_list = self.cell_forward(self.rGRUCells[0], x[::-1], h[1])
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
-                axis=-1,
-            )
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])], axis=-1)
             hn = tensor.concat([h_list[-1], hr_list[-1]])
 
         elif self.num_layers > 1 and not self.bidirectional:
@@ -694,12 +676,8 @@ class GRU(Module):
                 hn_list.append(h_list[-1])
                 hrn_list.append(hr_list[-1])
             output = tensor.concat(
-                [
-                    tensor.concat(h_list),
-                    tensor.concat(hr_list[::-1])
-                ],
-                axis=-1,
-            )
+                [tensor.concat(h_list),
+                 tensor.concat(hr_list[::-1])], axis=-1)
             hn = tensor.concat(hn_list + hrn_list)
 
         if self.batch_first and x.ndim == 3:

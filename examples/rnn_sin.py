@@ -63,8 +63,8 @@ for step in bar:
     steps = np.linspace(start, end, TIME_STEP, dtype=np.float32)
     x_np = np.sin(steps)
     y_np = np.sin(np.sin(steps) + 0.4 * np.cos(3 * steps))
-    x = Tensor(x_np[np.newaxis, :, np.newaxis]).to(device)
-    y = Tensor(y_np[np.newaxis, :, np.newaxis]).to(device)
+    x = Tensor(x_np[np.newaxis, :, np.newaxis], dtype=np.float32).to(device)
+    y = Tensor(y_np[np.newaxis, :, np.newaxis], dtype=np.float32).to(device)
     prediction, h_state = rnn(x, h_state)  #
     loss = criterion(prediction, y)
 
