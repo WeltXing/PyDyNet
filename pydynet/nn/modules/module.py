@@ -40,7 +40,8 @@ class Module:
 
     def parameters(self):
         for param in self._parameters.values():
-            yield param
+            if param.requires_grad:
+                yield param
 
     def train(self, mode: bool = True):
         set_grad_enabled(mode)

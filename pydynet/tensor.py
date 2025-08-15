@@ -165,10 +165,14 @@ class Tensor:
 
     def astype(self, new_type):
         '''类型转换, 我们不允许可求导节点的类型转换'''
+        assert not self.requires_grad
         with self.device:
-            self.data = self.data.astype(new_type)
-            self.dtype = self.data.dtype
-        return self
+            return Tensor(
+                self.data.astype(new_type),
+                self.dtype,
+                copy=None,
+                device=self.device,
+            )
 
     def reshape(self, *new_shape):
         return reshape(self, new_shape)

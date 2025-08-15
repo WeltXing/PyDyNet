@@ -13,8 +13,8 @@ class Dropout(Module):
     def forward(self, x) -> Tensor:
         if self._train:
             mask = rand(*x.shape, device=x.device) < 1 - self.p
-            return x * mask.astype(float)
-        return x * (1 - self.p)
+            return x * mask.astype(x.dtype) / (1 - self.p)
+        return x
 
     def __repr__(self) -> str:
         return "{}(p={})".format(self.__class__.__name__, self.p)

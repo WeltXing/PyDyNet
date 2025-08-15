@@ -50,7 +50,7 @@ class SGD(Optimizer):
         self,
         params: list[Tensor],
         lr: float,
-        momentum: float = 0.,
+        momentum: float = .5,
         weight_decay: float = 0.,
         nesterov=True,
     ) -> None:

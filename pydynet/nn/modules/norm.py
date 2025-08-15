@@ -51,9 +51,9 @@ class BatchNorm1d(Module):
 
     def reset_parameters(self):
         init.zeros_(self.running_mean)
-        init.zeros_(self.running_var)
-        init.kaiming_normal_(self.num_features)
+        init.ones_(self.running_var)
         init.zeros_(self.shift)
+        init.ones_(self.scale)
 
     def forward(self, x):
         if self._train:
@@ -125,9 +125,9 @@ class BatchNorm2d(Module):
 
     def reset_parameters(self):
         init.zeros_(self.running_mean)
-        init.zeros_(self.running_var)
-        init.kaiming_normal_(self.num_features)
+        init.ones_(self.running_var)
         init.zeros_(self.shift)
+        init.ones_(self.scale)
 
     def forward(self, x):
         if self._train:
@@ -195,9 +195,9 @@ class LayerNorm(Module):
 
     def reset_parameters(self):
         init.zeros_(self.running_mean)
-        init.zeros_(self.running_var)
-        init.kaiming_normal_(self.num_features)
+        init.ones_(self.running_var)
         init.zeros_(self.shift)
+        init.ones_(self.scale)
 
     def forward(self, x):
         if self._train:

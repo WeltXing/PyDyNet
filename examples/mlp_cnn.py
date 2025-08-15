@@ -1,15 +1,8 @@
-import sys, warnings
+import sys
 
 sys.path.append('../pydynet')
 
 import numpy as np
-# try:
-#     import cupy as cp
-# except ModuleNotFoundError:
-#     warnings.warn(
-#         "Cupy is not installed. You can install it with:\n"
-#         "  pip install cupy-cuda12x  # or appropriate version for your CUDA",
-#         category=UserWarning)
 
 import gzip
 from os.path import join
