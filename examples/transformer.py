@@ -114,8 +114,8 @@ class TransformerBlock(nn.Module):
     def __init__(self, embed_size, heads, dropout, forward_expansion):
         super(TransformerBlock, self).__init__()
         self.attention = SelfAttention(embed_size, heads)
-        self.norm1 = nn.RMSNorm(embed_size, dtype=np.float32)
-        self.norm2 = nn.RMSNorm(embed_size, dtype=np.float32)
+        self.norm1 = nn.LayerNorm(embed_size, dtype=np.float32)
+        self.norm2 = nn.LayerNorm(embed_size, dtype=np.float32)
 
         self.feed_forward = nn.Sequential(
             nn.Linear(embed_size,
@@ -172,8 +172,8 @@ class Transformer(nn.Module):
             padding_idx=0,
             dtype=np.float32,
         )
-        self.position_embedding = sinusoidal_positional_encoding(
-            max_length, embed_size)
+        self.position_embedding = nn.Parameter(sinusoidal_positional_encoding(
+            max_length, embed_size), False)
 
         self.layers = nn.ModuleList([
             TransformerBlock(
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         batch_size=TEST_BATCH_SIZE,
     )
 
-    net = Transformer(64, 2, 2, 3, 0.05, X.max() + 1, 44).to(device)
+    net = Transformer(512, 1, 4, 3, 0.05, X.max() + 1, 44).to(device)
     optimizer = Adam(net.parameters(), lr=LR)
     bar = tqdm(range(EPOCHES))
     info_list = []
@@ -279,7 +279,7 @@ if __name__ == "__main__":
         )
         info_list.append([train_acc.item(), test_acc.item()])
 
-    print(np.array(info_list))
+    info_list = np.array(info_list)
 
     plt.figure(figsize=(5, 3))
 
@@ -309,9 +309,9 @@ if __name__ == "__main__":
              linestyle='--')
 
     plt.xlim(0, 100)
-    plt.ylim(0, 1)
+    plt.ylim(.4, 1)
 
-    plt.yticks([0, .2, .4, .6, .8, 1], size=13)
+    plt.yticks([.4, .6, .8, 1], size=13)
     plt.xticks([20, 40, 60, 80, 100], size=13)
     plt.xlabel("Epochs", size=13)
     plt.legend()

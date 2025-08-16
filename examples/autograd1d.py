@@ -1,22 +1,26 @@
 import sys
 
-sys.path.append('../pydynet')
+# sys.path.append('../pydynet')
 
 import pydynet as pdn
 import numpy as np
 import matplotlib.pyplot as plt
 
+# device = 'cpu'
+# device = 'cuda:0'
+device = 'cuda:1'
 
 def auto_grad(x: float, lr: float, n_iter: int):
     x_list = [x]
-    x = pdn.Tensor(float(x), requires_grad=True)
+    x = pdn.Tensor(float(x), requires_grad=True, device=device)
 
     for _ in range(n_iter):
         x.zero_grad()
         y = pdn.log((x - 7)**2 + 6)
         y.backward()
 
-        x.data -= lr * x.grad
+        with x.device:
+            x.data -= lr * x.grad
         x_list.append(x.item())
 
     return x_list
@@ -31,6 +35,7 @@ def manual_grad(x: float, lr: float, n_iter: int):
         x_list.append(x)
 
     return x_list
+
 
 if __name__ == "__main__":
     x_ = np.linspace(0, 10, 101)

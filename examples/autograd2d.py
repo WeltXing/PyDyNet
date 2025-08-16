@@ -7,25 +7,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(42)
+
+device = 'cpu'
+# device = 'cuda:0'
+# device = 'cuda:1'
+
+
 x = np.random.randn(2)
 A = pdn.Tensor([
     [3, 1.],
     [1, 2.],
-])
-b = pdn.Tensor([-1., 1])
+]).to(device)
+b = pdn.Tensor([-1., 1]).to(device)
 
 
 def auto_grad(x, lr: float, n_iter: float):
     Xs, ys = [], []
-    x = pdn.Tensor(x, requires_grad=True)
+    x = pdn.Tensor(x, requires_grad=True, device=device)
 
     for _ in range(n_iter):
         obj = x @ A @ x / 2 + b @ x
         obj.backward()
 
-        Xs.append(x.data.copy())
+        Xs.append(x.numpy())
         ys.append(obj.item())
-        x.data -= lr * x.grad
+        with x.device:
+            x.data -= lr * x.grad
         x.zero_grad()
 
     Xs, ys = np.array(Xs), np.array(ys)
@@ -41,7 +48,7 @@ def manual_grad(x, lr: float, n_iter: float):
         Xs.append(x.copy())
         ys.append(obj.item())
 
-        grad = A.data @ x + b.data
+        grad = A.numpy() @ x + b.numpy()
         x -= lr * grad
 
     Xs, ys = np.array(Xs), np.array(ys)

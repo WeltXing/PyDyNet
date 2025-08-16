@@ -1,9 +1,2 @@
-numpy
-
-# cuda训练所需要的，需要考虑显卡版本，参考https://docs.cupy.dev/en/stable/install.html
-# cupy
-
-# 运行测试样例所需要的：
-# scikit-learn
-# matplotlib
-# tqdm
+numpy>=2.0.0
+cupy-cuda12x # For Cuda 12.x; refer to https://docs.cupy.dev/en/stable/install.html

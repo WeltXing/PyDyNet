@@ -8,6 +8,7 @@ class Parameter(Tensor):
             data=data.data,
             dtype=data.dtype,
             device=data.device,
+            copy=False,
             requires_grad=requires_grad,
         )
 

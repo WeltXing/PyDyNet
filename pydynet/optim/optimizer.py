@@ -66,12 +66,13 @@ class SGD(Optimizer):
 
     def step(self):
         for i in range(len(self.params)):
-            grad = self.params[i].grad + self.weight_decay * self.params[i].data
-            self.v[i] *= self.momentum
-            self.v[i] += self.lr * grad
-            self.params[i].data -= self.v[i]
-            if self.nesterov:
-                self.params[i].data -= self.lr * grad
+            with self.params[i].device:
+                grad = self.params[i].grad + self.weight_decay * self.params[i].data
+                self.v[i] *= self.momentum
+                self.v[i] += self.lr * grad
+                self.params[i].data -= self.v[i]
+                if self.nesterov:
+                    self.params[i].data -= self.lr * grad
 
 
 class Adagrad(Optimizer):
@@ -107,9 +108,10 @@ class Adagrad(Optimizer):
 
     def step(self):
         for i in range(len(self.params)):
-            grad = self.params[i].grad + self.weight_decay * self.params[i].data
-            self.G[i] += grad**2
-            self.params[i].data -= self.lr * grad / (self.eps + self.G[i])**0.5
+            with self.params[i].device:
+                grad = self.params[i].grad + self.weight_decay * self.params[i].data
+                self.G[i] += grad**2
+                self.params[i].data -= self.lr * grad / (self.eps + self.G[i])**0.5
 
 
 class Adadelta(Optimizer):
@@ -148,10 +150,11 @@ class Adadelta(Optimizer):
 
     def step(self):
         for i in range(len(self.params)):
-            grad = self.params[i].grad + self.weight_decay * self.params[i].data
+            with self.params[i].device:
+                grad = self.params[i].grad + self.weight_decay * self.params[i].data
 
-            self.G[i] = self.rho * self.G[i] + (1 - self.rho) * grad**2
-            self.params[i].data -= self.lr * grad / (self.G[i] + self.eps)**0.5
+                self.G[i] = self.rho * self.G[i] + (1 - self.rho) * grad**2
+                self.params[i].data -= self.lr * grad / (self.G[i] + self.eps)**0.5
 
 
 class Adam(Optimizer):
@@ -181,12 +184,13 @@ class Adam(Optimizer):
 
     def step(self):
         for i in range(len(self.params)):
-            grad = self.params[i].grad + self.weight_decay * self.params[i].data
-            self.m[i] *= self.beta1
-            self.m[i] += (1 - self.beta1) * grad
-            self.v[i] *= self.beta2
-            self.v[i] += (1 - self.beta2) * grad**2
-            a_t = sqrt(1 - self.beta2**self.t) / (1 - self.beta1**self.t)
-            self.params[i].data -= self.lr * a_t * self.m[i] / (
-                self.v[i]**0.5 + self.eps)
+            with self.params[i].device:
+                grad = self.params[i].grad + self.weight_decay * self.params[i].data
+                self.m[i] *= self.beta1
+                self.m[i] += (1 - self.beta1) * grad
+                self.v[i] *= self.beta2
+                self.v[i] += (1 - self.beta2) * grad**2
+                a_t = sqrt(1 - self.beta2**self.t) / (1 - self.beta1**self.t)
+                self.params[i].data -= self.lr * a_t * self.m[i] / (
+                    self.v[i]**0.5 + self.eps)
         self.t += 1

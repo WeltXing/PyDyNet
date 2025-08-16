@@ -108,7 +108,7 @@ class __im2col1d(tensor.UnaryOperator):
             shape=self.shape,
             strides=self.__strides,
         )
-        np.add.at(view, (..., ), grad)
+        self.xp.add.at(view, (..., ), grad)
         return grad_x
 
 
@@ -265,7 +265,7 @@ class __im2col2d(tensor.UnaryOperator):
             shape=self.shape,
             strides=self.__strides,
         )
-        np.add.at(view, (..., ), grad)
+        self.xp.add.at(view, (..., ), grad)
         return grad_x
 
 

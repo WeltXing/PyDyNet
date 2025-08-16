@@ -47,7 +47,7 @@ class MNISTDataset:
             f.read(16)
             # Read the rest of the file
             buffer = f.read()
-            data = np.frombuffer(buffer, dtype=np.uint8).astype(np.float32)
+            data = np.frombuffer(buffer, dtype=np.uint8).astype(DTYPE)
             # Normalize the data to be in the range [0, 1]
             data = data / 255.0
             # Reshape the data to be in the shape (number_of_images, 28, 28)
@@ -74,31 +74,31 @@ class Flatten(nn.Module):
         return x.reshape(x.shape[0], -1)
 
 
-class ResidualMLP(nn.Module):
+class MLP(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
         self.layer1 = nn.Sequential(
             Flatten(),
-            nn.Linear(28 * 28, 1024, dtype=np.float32),
+            nn.Linear(28 * 28, 1024, dtype=DTYPE),
         )
-        self.layer2 = nn.Linear(1024, 1024, dtype=np.float32)
-        self.layer3 = nn.Linear(1024, 10, dtype=np.float32)
+        self.layer2 = nn.Linear(1024, 1024, dtype=DTYPE)
+        self.layer3 = nn.Linear(1024, 10, dtype=DTYPE)
 
     def forward(self, x):
         z1 = F.relu(self.layer1(x))
         z2 = F.relu(self.layer2(z1))
-        return self.layer3(z1 + z2)
+        return self.layer3(z2)
 
 
 class ConvNet(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 20, 3, 1, dtype=np.float32)
-        self.conv2 = nn.Conv2d(20, 50, 3, 1, dtype=np.float32)
-        self.fc1 = nn.Linear(7 * 7 * 50, 500, dtype=np.float32)
-        self.fc2 = nn.Linear(500, 10, dtype=np.float32)
+        self.conv1 = nn.Conv2d(1, 20, 3, 1, dtype=DTYPE)
+        self.conv2 = nn.Conv2d(20, 50, 3, 1, dtype=DTYPE)
+        self.fc1 = nn.Linear(7 * 7 * 50, 500, dtype=DTYPE)
+        self.fc2 = nn.Linear(500, 10, dtype=DTYPE)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -113,13 +113,15 @@ class ConvNet(nn.Module):
 if __name__ == "__main__":
     LR = 1e-4
     EPOCHES = 50
-    TRAIN_BATCH_SIZE = 128
-    TEST_BATCH_SIZE = 512
+    TRAIN_BATCH_SIZE = 512
+    TEST_BATCH_SIZE = 1024
     use_cuda = True
+    
+    DTYPE = np.float32
 
     np.random.seed(42)
 
-    device = 'cuda' if pdn.cuda.is_available() and use_cuda else 'cpu'
+    device = 'cuda:0' if pdn.cuda.is_available() and use_cuda else 'cpu'
 
     net = ConvNet().to(device)
     print(net)

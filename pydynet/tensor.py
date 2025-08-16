@@ -24,20 +24,6 @@ class Graph:
         cls.size -= 1
 
 
-def backward_subroutine(last, node):
-    if last.requires_grad:
-        add_grad = node.grad_fn(last, node.grad)
-        if add_grad.shape != last.shape:
-            # handle broadcast
-            dim1, dim2 = add_grad.ndim, last.ndim
-            axis = (-i for i in range(1, dim2 + 1) if last.shape[-i] == 1)
-            add_grad = node.xp.sum(add_grad, axis=tuple(axis), keepdims=True)
-            if dim1 != dim2:  # dim1 >= dim2 for sure
-                add_grad = add_grad.sum(tuple(range(dim1 - dim2)))
-        last.grad += add_grad
-    return last
-
-
 class Tensor:
     '''
     将数据(NumPy数组)包装成可微分张量
@@ -96,7 +82,8 @@ class Tensor:
                 raise TypeError(
                     "Only Tensors of floating point dtype can require gradients!"
                 )
-            self.grad = self.xp.zeros(self.shape, dtype=dtype)
+            with self.device:
+                self.grad = self.xp.zeros(self.shape, dtype=dtype)
             self.last: list[Tensor] = list()
             Graph.add_node(self)
         else:
@@ -384,19 +371,34 @@ class Tensor:
         if self.size > 1:
             raise ValueError("backward should be called only on a scalar.")
 
-        self.grad = self.xp.ones(self.shape, dtype=self.dtype)
         y_id = Graph.size - Graph.node_list[::-1].index(self) - 1
-        for node in Graph.node_list[y_id::-1]:
-            for last in node.last:
-                backward_subroutine(last, node)
+        with self.device:
+            self.grad = self.xp.ones(self.shape, dtype=self.dtype)
+            for node in Graph.node_list[y_id::-1]:
+                for last in node.last:
+                    if last.requires_grad:
+                        add_grad = node.grad_fn(last, node.grad)
+                        if add_grad.shape != last.shape:
+                            # handle broadcast
+                            dim1, dim2 = add_grad.ndim, last.ndim
+                            add_grad = add_grad.sum(
+                                axis=tuple(i for i in range(dim2)
+                                           if last.shape[i] == 1),
+                                keepdims=True,
+                            )
+                            if dim1 != dim2:  # dim1 >= dim2 for sure
+                                add_grad = add_grad.sum(
+                                    tuple(range(dim1 - dim2)))
+                        last.grad += add_grad
 
-            # if not retain graph and node is not leaf, free it
-            if not retain_graph and not node.is_leaf:
-                Graph.free_node(node)
+                # if not retain graph and node is not leaf, free it
+                if not retain_graph and not node.is_leaf:
+                    Graph.free_node(node)
 
     def zero_grad(self):
         '''梯度归零'''
-        self.grad[...] = 0
+        with self.device:
+            self.grad[...] = 0.
 
     def numpy(self) -> np.ndarray:
         '''返回Tensor的内部数据, 即NumPy数组(拷贝)'''
@@ -414,6 +416,8 @@ class Tensor:
             self.device = device
             with device:
                 self.data = self.xp.asarray(self.data)
+                if self.requires_grad:
+                    self.grad = self.xp.asarray(self.grad)
         return self
 
     def cpu(self):
@@ -683,15 +687,11 @@ class matmul(BinaryOperator):
         if node is self.last[0]:
             grad1 = grad @ (self.xp.atleast_2d(self.last[1].data) if self.
                             expand_b else self.last[1].data.swapaxes(-1, -2))
-            if self.expand_a:
-                grad1 = grad1[0]
-            return grad1
+            return grad1[0] if self.expand_a else grad1
         else:
             grad2 = (self.xp.atleast_2d(self.last[0].data) if self.expand_a
                      else self.last[0].data).swapaxes(-1, -2) @ grad
-            if self.expand_b:
-                grad2 = grad2[..., 0]
-            return grad2
+            return grad2[0] if self.expand_b else grad2
 
 
 class abs(UnaryOperator):

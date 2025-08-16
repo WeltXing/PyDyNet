@@ -93,9 +93,9 @@ class Device:
         return np if self.device == "cpu" else cp
 
     def __enter__(self):
-        if self.device != "cpu":
+        if self.device != "cpu" and self.device_id != current_device():
             return self.device.__enter__()
 
     def __exit__(self, type, value, trace):
-        if self.device != "cpu":
+        if self.device != "cpu" and self.device_id != current_device():
             return self.device.__exit__(type, value, trace)

@@ -71,7 +71,7 @@ class DNN_BN(DNN):
 
 
 use_cuda = True
-device = 'cuda' if pdn.cuda.is_available() and use_cuda else 'cpu'
+device = 'cuda:0' if pdn.cuda.is_available() and use_cuda else 'cpu'
 
 net1 = DNN().to(device)
 net2 = DNN_dropout().to(device)
