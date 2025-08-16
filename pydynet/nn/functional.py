@@ -14,7 +14,7 @@ def embedding(x: tensor.Tensor, weight: tensor.Tensor, padding_idx: int):
     query = weight[x]
     if padding_idx is not None:
         with tensor.no_grad():
-            mask = unsqueeze(x != padding_idx, -1)
+            mask = unsqueeze(x.ne(padding_idx), -1)
         query = query * mask
     return query
 

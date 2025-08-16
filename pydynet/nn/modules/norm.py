@@ -178,7 +178,9 @@ class LayerNorm(Module):
     ) -> None:
         super().__init__()
         kwargs = {"device": Device(device), "dtype": dtype}
-        self.normalized_shape = normalized_shape
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape, )
+        self.normalized_shape = tuple(normalized_shape)
         self.eps = eps
         self.momentum = momentum
         self.running_mean = Parameter(

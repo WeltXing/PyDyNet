@@ -74,4 +74,6 @@ class Embedding(Module):
         if self.padding_idx is not None:
             with no_grad():
                 self.weight[self.padding_idx].data = self.weight.xp.zeros(
-                    self.weight[self.padding_idx].data.shape)
+                    self.weight[self.padding_idx].shape,
+                    dtype=self.weight.dtype,
+                )

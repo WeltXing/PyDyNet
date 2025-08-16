@@ -169,7 +169,7 @@ class Tensor:
         with self.device:
             return Tensor(
                 self.data.astype(new_type),
-                self.dtype,
+                new_type,
                 copy=None,
                 device=self.device,
             )
@@ -289,7 +289,7 @@ class Tensor:
         >>> x
         <[0 0 3], int64, Tensor>
         '''
-        if is_grad_enable():
+        if is_grad_enable() and self.requires_grad:
             raise ValueError(
                 "In-place operation is forbidden in node requires grad.")
         if isinstance(key, Tensor):
@@ -331,7 +331,16 @@ class Tensor:
             other = other.data
 
         with self.device:
-            return Tensor(func(self.data, other), self.xp.bool_, self.device)
+            return Tensor(func(self.data, other), self.xp.bool_, None,
+                          self.device, False)
+
+    @no_grad()
+    def eq(self, other):
+        return self.__compare(other, lambda x, y: x == y)
+
+    @no_grad()
+    def ne(self, other):
+        return self.__compare(other, lambda x, y: x != y)
 
     @no_grad()
     def __lt__(self, other):
@@ -928,6 +937,15 @@ class minimum(BinaryOperator):
         return (self.data == x) * grad
 
 
+class sign(UnaryOperator):
+
+    def forward_(self, x: Tensor) -> np.ndarray:
+        return self.xp.sign(x.data)
+
+    def grad_fn(self, x, grad):
+        return self.xp.zeros(self.shape, dtype=self.dtype)
+
+
 # 非计算函数
 class reshape(UnaryOperator):
     '''
@@ -1267,3 +1285,26 @@ def unsqueeze(x: Tensor, axis):
     shape_it = iter(x.shape)
     shape = [1 if ax in axis else next(shape_it) for ax in range(out_ndim)]
     return x.reshape(*shape)
+
+
+def squeeze(x: Tensor, axis=None):
+    shape = x.shape
+    if axis is None:
+        new_shape = tuple(dim for dim in shape if dim != 1)
+    else:
+        if isinstance(axis, int):
+            axis = (axis, )
+        axis = tuple(axis)
+
+        for ax in axis:
+            if ax >= len(shape) or ax < -len(shape):
+                raise ValueError("Axis out of range")
+            if shape[ax] != 1:
+                raise ValueError(
+                    f"Cannot squeeze axis {ax} with size {shape[ax]}")
+
+        # 构造新形状，排除指定轴
+        new_shape = tuple(dim for i, dim in enumerate(shape) if i not in axis)
+
+    # 返回重塑后的数组
+    return x.reshape(*new_shape)
