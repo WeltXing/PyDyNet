@@ -57,7 +57,7 @@ if __name__ == '__main__':
     max_seq_len: int = 1024  # M
     max_new_tokens: int = 1024
     max_batch_size: int = 1
-    datatype = np.float64
+    datatype = np.float32
 
     tokenizer = Tokenizer("llama/data/tokenizer.model.np")
     model = load_model(
