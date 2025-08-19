@@ -691,7 +691,7 @@ class matmul(BinaryOperator):
         else:
             grad2 = (self.xp.atleast_2d(self.last[0].data) if self.expand_a
                      else self.last[0].data).swapaxes(-1, -2) @ grad
-            return grad2[0] if self.expand_b else grad2
+            return grad2[..., 0] if self.expand_b else grad2
 
 
 class abs(UnaryOperator):
