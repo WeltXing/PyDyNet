@@ -1,6 +1,7 @@
 import numpy as np
 
-from .. import tensor, unsqueeze, no_grad
+from ..core import tensor, function
+from .. import unsqueeze, no_grad
 
 
 def linear(x: tensor.Tensor, weight: tensor.Tensor, bias: tensor.Tensor):
@@ -358,7 +359,7 @@ def avg_pool2d(x: tensor.Tensor, kernel_size: int, stride: int, padding=0):
 
 def mse_loss(y_pred, y_true, reduction='mean'):
     '''均方误差'''
-    square_sum = tensor.square(y_pred - y_true)
+    square_sum = function.square(y_pred - y_true)
     if reduction == 'mean':
         return tensor.mean(square_sum)
     elif reduction == 'sum':

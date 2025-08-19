@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 import pydynet as pdn
-from pydynet.tensor import Tensor
+from pydynet.core.tensor import Tensor
 import pydynet.nn as nn
 import pydynet.nn.functional as F
 

@@ -1,5 +1,5 @@
 import numpy as np
-from .tensor import Tensor
+from .core import Tensor
 
 
 # 一些包装的特殊矩阵

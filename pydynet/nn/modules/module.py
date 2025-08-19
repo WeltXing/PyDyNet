@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from ..parameter import Parameter
-from ...tensor import Tensor
+from ...core import Tensor
 from ...autograd import set_grad_enabled
 from ...cuda import Device, current_device
 

@@ -1,5 +1,5 @@
 from .module import Module
-from ...tensor import Tensor
+from ...core import Tensor
 from ...special import rand
 
 

@@ -1,11 +1,13 @@
+from __future__ import annotations
 import numpy as np
-from .cuda import Device
-from .autograd import is_grad_enable, no_grad
+
+from ..cuda import Device
+from ..autograd import is_grad_enable, no_grad
 
 
 class Graph:
     '''计算图, 全局共用一个动态计算图'''
-    node_list: list = list()
+    node_list: list[Tensor] = list()
     size = 0
 
     @classmethod
@@ -150,6 +152,17 @@ class Tensor:
     def T(self):
         return self.transpose()
 
+    def __repr__(self) -> str:
+        return "{}({}, requires_grad={}".format(
+            "Tensor",
+            self.data,
+            self.requires_grad,
+        ) + (", device={}".format(self.device)
+             if self.device.device != "cpu" else "") + ")"
+
+    def __len__(self) -> int:
+        return len(self.data)
+
     def astype(self, new_type):
         '''类型转换, 我们不允许可求导节点的类型转换'''
         assert not self.requires_grad
@@ -170,18 +183,6 @@ class Tensor:
     def swapaxes(self, axis1: int, axis2: int):
         return swapaxes(self, axis1, axis2)
 
-    def vsplit(self, indices_or_sections: int | tuple):
-        return vsplit(self, indices_or_sections)
-
-    def hsplit(self, indices_or_sections: int | tuple):
-        return hsplit(self, indices_or_sections)
-
-    def dsplit(self, indices_or_sections: int | tuple):
-        return dsplit(self, indices_or_sections)
-
-    def split(self, indices_or_sections: int | tuple, axis=0):
-        return split(self, indices_or_sections, axis=axis)
-
     def max(self, axis: int | tuple | None = None, keepdims: bool = False):
         return max(self, axis, keepdims)
 
@@ -199,18 +200,6 @@ class Tensor:
 
     def argmin(self, axis: int | tuple | None = None, keepdims: bool = False):
         return argmin(self, axis, keepdims)
-
-    def build_edge(self, node):
-        '''构建节点的有向边, 正常不适用'''
-        node.last.append(self)
-
-    def __repr__(self) -> str:
-        return "{}({}, requires_grad={}".format(
-            "Tensor",
-            self.data,
-            self.requires_grad,
-        ) + (", device={}".format(self.device)
-             if self.device.device != "cpu" else "") + ")"
 
     def __add__(self, x):
         return add(self, x)
@@ -261,21 +250,6 @@ class Tensor:
         return _get_slice(self, key)
 
     def __setitem__(self, key, value):
-        '''
-        重载了切片/索引赋值的操作, 我们不允许self允许求导, 否则将出现错误
-
-        Parameters
-        ----------
-        key : 索引, 支持NumPy的数字、切片和条件索引
-        value : 值, 可以是NumPy数字, 也可以是数字
-
-        Example
-        -------
-        >>> x = Tensor([1, 2, 3])
-        >>> x[x <= 2] = 0
-        >>> x
-        <[0 0 3], int64, Tensor>
-        '''
         if is_grad_enable() and self.requires_grad:
             raise ValueError(
                 "In-place operation is forbidden in node requires grad.")
@@ -284,9 +258,6 @@ class Tensor:
 
         with self.device:
             self.data[key] = value.data if isinstance(value, Tensor) else value
-
-    def __len__(self) -> int:
-        return len(self.data)
 
     def __inplace(self, other, func):
         if self.requires_grad:
@@ -395,6 +366,9 @@ class Tensor:
                 if not retain_graph and not node.is_leaf:
                     Graph.free_node(node)
 
+    def _build_edge(self, node: Tensor):
+        node.last.append(self)
+
     def zero_grad(self):
         '''梯度归零'''
         with self.device:
@@ -459,7 +433,7 @@ class _UnaryOperator(Tensor):
             requires_grad=is_grad_enable() and x.requires_grad,
         )
         if self.requires_grad:
-            x.build_edge(self)
+            x._build_edge(self)
 
     def forward(self, x: Tensor) -> np.ndarray:
         with self.device:
@@ -524,8 +498,8 @@ class _BinaryOperator(Tensor):
             and (x.requires_grad or y.requires_grad),
         )
         if self.requires_grad:
-            x.build_edge(self)
-            y.build_edge(self)
+            x._build_edge(self)
+            y._build_edge(self)
 
     def forward(self, x: Tensor, y: Tensor) -> np.ndarray:
         with self.device:
@@ -707,184 +681,88 @@ class abs(_UnaryOperator):
         return self.xp.abs(x.data)
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        mask = self.xp.zeros(x.shape, dtype=x.dtype)
-        mask[x.data > 0] = 1.
-        mask[x.data < 0] = -1.
-        return grad * mask
+        return grad * self.xp.sign(x)
 
 
-class sum(_UnaryOperator):
-    '''
-    求和算子, 在Tensor类中扩展为类方法
+class _ReduceOperator(_UnaryOperator):
 
-    Parameters
-    ----------
-    axis : None
-        求和方向(轴)
-    keepdims : bool, default=False
-        是否保留原来维度
-
-    Example
-    -------
-    >>> x = Tensor(
-            [[1, 2, 3],
-            [4, 5, 6]]
-        )
-    >>> s1 = x.sum(0) # [5, 7, 9]
-    >>> s2 = x.sum(1) # [6, 15]
-    >>> s3 = sum(x, keepdims=True) # [[21]]
-    ```
-    '''
-
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
+    def __init__(self, x: Tensor, axis=None, keepdims=False, func: str = ...):
         self.axis = axis
         self.keepdims = keepdims
+        self._scalar_or_keeps = self.axis is None or self.keepdims
+        self.reduce_func = getattr(x.xp, func)
         super().__init__(x)
 
-    def forward_(self, x: Tensor) -> np.ndarray:
-        return self.xp.sum(x.data, axis=self.axis, keepdims=self.keepdims)
+    def forward_(self, x):
+        return self.reduce_func(x.data, axis=self.axis, keepdims=self.keepdims)
 
-    def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
+    def grad_fn(self, x, grad):
         if not (self.axis is None or self.keepdims):
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return self.xp.ones(x.shape, dtype=x.dtype) * grad
+
+        return self._reduce_grad_fn(x.data, grad)
+
+    def _reduce_grad_fn(self, x_data, grad):
+        raise NotImplementedError
 
 
-class mean(_UnaryOperator):
-    '''
-    求均值算子, 在Tensor类中扩展为类方法
+class sum(_ReduceOperator):
 
-    Parameters
-    ----------
-    axis : None
-        求均值方向(轴)
-    keepdims : bool, default=False
-        是否保留原来维度
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'sum')
 
-    See also
-    --------
-    sum : 求和算子
-    '''
-
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
-        self.axis = axis
-        self.keepdims = keepdims
-        super().__init__(x)
-
-    def forward_(self, x: Tensor) -> np.ndarray:
-        return self.xp.mean(x.data, axis=self.axis, keepdims=self.keepdims)
-
-    def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        if not (self.axis is None or self.keepdims):
-            grad = self.xp.expand_dims(grad, axis=self.axis)
-        return self.xp.ones(
-            x.shape, dtype=x.dtype) * grad * self.data.size / x.data.size
+    def _reduce_grad_fn(self, x_data: np.ndarray, grad):
+        return self.xp.broadcast_to(grad, x_data.shape)
 
 
-class max(_UnaryOperator):
-    '''
-    求最大值算子, 在Tensor类中扩展为类方法
+class mean(_ReduceOperator):
 
-    Parameters
-    ----------
-    axis : None
-        求最大值方向(轴)
-    keepdims : bool, default=False
-        是否保留原来维度
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'mean')
 
-    See also
-    --------
-    sum : 求和算子
-    '''
+    def _reduce_grad_fn(self, x_data: np.ndarray, grad):
+        return self.xp.broadcast_to(grad,
+                                    x_data.shape) * self.size / x_data.size
 
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
-        self.axis = axis
-        self.keepdims = keepdims
-        super().__init__(x)
 
-    def forward_(self, x: Tensor) -> np.ndarray:
-        return self.xp.max(x.data, axis=self.axis, keepdims=self.keepdims)
+class max(_ReduceOperator):
+
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'max')
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        if self.keepdims or self.axis is None:
+        if self._scalar_or_keeps:
             full_dim_y = self.data
         else:
-            # 还原维度
             full_dim_y = self.xp.expand_dims(self.data, axis=self.axis)
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return (full_dim_y == x.data).astype(x.dtype) * grad
+        return (full_dim_y == x.data) * grad
 
 
-class min(_UnaryOperator):
-    '''
-    求最小值算子, 在Tensor类中扩展为类方法
+class min(_ReduceOperator):
 
-    Parameters
-    ----------
-    axis : None
-        求最大值方向(轴)
-    keepdims : bool, default=False
-        是否保留原来维度
-
-    See also
-    --------
-    max : 求最大值算子
-    '''
-
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
-        self.axis = axis
-        self.keepdims = keepdims
-        super().__init__(x)
-
-    def forward_(self, x: Tensor) -> np.ndarray:
-        return self.xp.min(x.data, axis=self.axis, keepdims=self.keepdims)
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'min')
 
     def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
-        if self.keepdims or self.axis is None:
+        if self._scalar_or_keeps:
             full_dim_y = self.data
         else:
-            # 还原维度
             full_dim_y = self.xp.expand_dims(self.data, axis=self.axis)
             grad = self.xp.expand_dims(grad, axis=self.axis)
-        return (full_dim_y == x.data).astype(x.dtype) * grad
+        return (full_dim_y == x.data) * grad
 
 
-class argmax(Tensor):
+class argmax(_ReduceOperator):
 
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
-        if not isinstance(x, Tensor):
-            x = Tensor(x)
-        self.axis = axis
-        self.keepdims = keepdims
-        self.device = x.device
-        super().__init__(self.forward(x), copy=False, device=self.device)
-
-    def forward(self, x: Tensor) -> np.ndarray:
-        with self.device:
-            return self.xp.argmax(
-                x.data,
-                axis=self.axis,
-                keepdims=self.keepdims,
-            )
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'argmax')
 
 
-class argmin(Tensor):
+class argmin(_ReduceOperator):
 
-    def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
-        if not isinstance(x, Tensor):
-            x = Tensor(x)
-        self.axis = axis
-        self.keepdims = keepdims
-        self.device = x.device
-        super().__init__(self.forward(x), copy=False, device=self.device)
-
-    def forward(self, x: Tensor) -> np.ndarray:
-        with self.device:
-            return self.xp.argmin(
-                x.data,
-                axis=self.axis,
-                keepdims=self.keepdims,
-            )
+    def __init__(self, x, axis=None, keepdims=False):
+        super().__init__(x, axis, keepdims, 'argmin')
 
 
 class exp(_UnaryOperator):
@@ -1091,7 +969,7 @@ class concat(Tensor):
         )
         if self.requires_grad:
             for i in range(len(self.tensors)):
-                self.tensors[i].build_edge(self)
+                self.tensors[i]._build_edge(self)
 
     def forward(self):
         with self.device:
@@ -1105,206 +983,3 @@ class concat(Tensor):
         slc = [slice(None)] * grad.ndim
         slc[self.axis] = slice(start, end)
         return grad[tuple(slc)]
-
-
-def sqrt(x: Tensor):
-    '''平方根函数'''
-    return x**0.5
-
-
-def square(x: Tensor):
-    '''平方函数'''
-    return x * x
-
-
-def vsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
-    if not isinstance(x, Tensor):
-        x = Tensor(x)
-
-    try:
-        len(indices_or_sections)
-    except TypeError:
-        sections = indices_or_sections
-        N = x.shape[0]
-        assert N % sections == 0, 'array split does not result in an equal division'
-
-    Ntotal = x.shape[0]
-    try:
-        # handle array case.
-        Nsections = len(indices_or_sections) + 1
-        div_points = [0] + list(indices_or_sections) + [Ntotal]
-    except TypeError:
-        # indices_or_sections is a scalar, not an array.
-        Nsections = int(indices_or_sections)
-        if Nsections <= 0:
-            raise ValueError(
-                'number sections must be larger than 0.') from None
-        Neach_section, extras = divmod(Ntotal, Nsections)
-        section_sizes = ([0] + extras * [Neach_section + 1] +
-                         (Nsections - extras) * [Neach_section])
-        div_points = x.xp.array(section_sizes, dtype=x.xp.intp).cumsum()
-
-    sub_tensors = []
-    for i in range(Nsections):
-        st = div_points[i]
-        end = div_points[i + 1]
-        sub_tensors.append(x[st:end])
-
-    return sub_tensors
-
-
-def hsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
-    if not isinstance(x, Tensor):
-        x = Tensor(x)
-
-    try:
-        len(indices_or_sections)
-    except TypeError:
-        sections = indices_or_sections
-        N = x.shape[1]
-        assert N % sections == 0, 'array split does not result in an equal division'
-
-    Ntotal = x.shape[1]
-    try:
-        # handle array case.
-        Nsections = len(indices_or_sections) + 1
-        div_points = [0] + list(indices_or_sections) + [Ntotal]
-    except TypeError:
-        # indices_or_sections is a scalar, not an array.
-        Nsections = int(indices_or_sections)
-        if Nsections <= 0:
-            raise ValueError(
-                'number sections must be larger than 0.') from None
-        Neach_section, extras = divmod(Ntotal, Nsections)
-        section_sizes = ([0] + extras * [Neach_section + 1] +
-                         (Nsections - extras) * [Neach_section])
-        div_points = x.xp.array(section_sizes, dtype=x.xp.intp).cumsum()
-
-    sub_tensors = []
-    for i in range(Nsections):
-        st = div_points[i]
-        end = div_points[i + 1]
-        sub_tensors.append(x[:, st:end])
-
-    return sub_tensors
-
-
-def dsplit(x: Tensor, indices_or_sections: int | tuple) -> list[Tensor]:
-    if not isinstance(x, Tensor):
-        x = Tensor(x)
-
-    try:
-        len(indices_or_sections)
-    except TypeError:
-        sections = indices_or_sections
-        N = x.shape[2]
-        assert N % sections == 0, 'array split does not result in an equal division'
-
-    Ntotal = x.shape[2]
-    try:
-        # handle array case.
-        Nsections = len(indices_or_sections) + 1
-        div_points = [0] + list(indices_or_sections) + [Ntotal]
-    except TypeError:
-        # indices_or_sections is a scalar, not an array.
-        Nsections = int(indices_or_sections)
-        if Nsections <= 0:
-            raise ValueError(
-                'number sections must be larger than 0.') from None
-        Neach_section, extras = divmod(Ntotal, Nsections)
-        section_sizes = ([0] + extras * [Neach_section + 1] +
-                         (Nsections - extras) * [Neach_section])
-        div_points = x.xp.array(section_sizes, dtype=x.xp.intp).cumsum()
-
-    sub_tensors = []
-    for i in range(Nsections):
-        st = div_points[i]
-        end = div_points[i + 1]
-        sub_tensors.append(x[:, :, st:end])
-
-    return sub_tensors
-
-
-def split(
-    x: Tensor,
-    indices_or_sections: int | tuple,
-    axis: int = 0,
-) -> list[Tensor]:
-    if not isinstance(x, Tensor):
-        x = Tensor(x)
-
-    if axis == 0 or axis == -x.ndim:
-        return vsplit(x, indices_or_sections)
-    elif axis == 1 or axis == -x.ndim + 1:
-        return hsplit(x, indices_or_sections)
-    elif axis == 2 or axis == -x.ndim + 2:
-        return dsplit(x, indices_or_sections)
-
-    try:
-        len(indices_or_sections)
-    except TypeError:
-        sections = indices_or_sections
-        N = x.shape[axis]
-        assert N % sections == 0, 'array split does not result in an equal division'
-
-    Ntotal = x.shape[axis]
-    try:
-        # handle array case.
-        Nsections = len(indices_or_sections) + 1
-        div_points = [0] + list(indices_or_sections) + [Ntotal]
-    except TypeError:
-        # indices_or_sections is a scalar, not an array.
-        Nsections = int(indices_or_sections)
-        if Nsections <= 0:
-            raise ValueError(
-                'number sections must be larger than 0.') from None
-        Neach_section, extras = divmod(Ntotal, Nsections)
-        section_sizes = ([0] + extras * [Neach_section + 1] +
-                         (Nsections - extras) * [Neach_section])
-        div_points = x.xp.array(section_sizes, dtype=x.xp.intp).cumsum()
-
-    sub_tensors = []
-    stensor = swapaxes(x, 0, axis)
-    for i in range(Nsections):
-        st = div_points[i]
-        end = div_points[i + 1]
-        sub_tensors.append(swapaxes(stensor[st:end], axis, 0))
-    return sub_tensors
-
-
-def unsqueeze(x: Tensor, axis):
-    '''等价于numpy的expand_dims, 因此我们借用了expand_dims的源码'''
-    from numpy.core.numeric import normalize_axis_tuple
-
-    if type(axis) not in (tuple, list):
-        axis = (axis, )
-
-    out_ndim = len(axis) + x.ndim
-    axis = normalize_axis_tuple(axis, out_ndim)
-
-    shape_it = iter(x.shape)
-    shape = [1 if ax in axis else next(shape_it) for ax in range(out_ndim)]
-    return x.reshape(*shape)
-
-
-def squeeze(x: Tensor, axis=None):
-    shape = x.shape
-    if axis is None:
-        new_shape = tuple(dim for dim in shape if dim != 1)
-    else:
-        if isinstance(axis, int):
-            axis = (axis, )
-        axis = tuple(axis)
-
-        for ax in axis:
-            if ax >= len(shape) or ax < -len(shape):
-                raise ValueError("Axis out of range")
-            if shape[ax] != 1:
-                raise ValueError(
-                    f"Cannot squeeze axis {ax} with size {shape[ax]}")
-
-        # 构造新形状，排除指定轴
-        new_shape = tuple(dim for i, dim in enumerate(shape) if i not in axis)
-
-    # 返回重塑后的数组
-    return x.reshape(*new_shape)

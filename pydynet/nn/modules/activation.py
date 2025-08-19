@@ -1,6 +1,6 @@
 from .module import Module
 from .. import functional as F
-from ...tensor import Tensor
+from ...core import Tensor
 
 
 class Sigmoid(Module):

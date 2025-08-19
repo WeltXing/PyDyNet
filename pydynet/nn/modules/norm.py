@@ -2,7 +2,7 @@ from .module import Module
 from ..parameter import Parameter
 from .. import init
 from ...special import empty
-from ... import tensor
+from ... import core
 from ...cuda import Device
 
 
@@ -59,8 +59,8 @@ class BatchNorm1d(Module):
         if self._train:
             mean = x.mean(0)
             center_data = x - mean
-            var = tensor.mean(tensor.square(center_data), 0)
-            std_data = center_data / tensor.sqrt(var + self.eps)
+            var = core.mean(core.square(center_data), 0)
+            std_data = center_data / core.sqrt(var + self.eps)
 
             self.running_mean *= (1 - self.momentum)
             self.running_mean += self.momentum * mean
@@ -69,7 +69,7 @@ class BatchNorm1d(Module):
 
             return std_data * self.scale + self.shift
         else:
-            return (x - self.running_mean) * self.scale / tensor.sqrt(
+            return (x - self.running_mean) * self.scale / core.sqrt(
                 self.running_var + self.eps) + self.shift
 
     def __repr__(self) -> str:
@@ -133,9 +133,8 @@ class BatchNorm2d(Module):
         if self._train:
             mean = x.mean((0, 2, 3), keepdims=True)
             center_data = x - mean
-            var = tensor.mean(tensor.square(center_data), (0, 2, 3),
-                              keepdims=True)
-            std_data = center_data / tensor.sqrt(var + self.eps)
+            var = core.mean(core.square(center_data), (0, 2, 3), keepdims=True)
+            std_data = center_data / core.sqrt(var + self.eps)
 
             self.running_mean *= (1 - self.momentum)
             self.running_mean += self.momentum * mean
@@ -144,7 +143,7 @@ class BatchNorm2d(Module):
 
             return std_data * self.scale + self.shift
         else:
-            return (x - self.running_mean) * self.scale / tensor.sqrt(
+            return (x - self.running_mean) * self.scale / core.sqrt(
                 self.running_var + self.eps) + self.shift
 
     def __repr__(self) -> str:
@@ -206,8 +205,8 @@ class LayerNorm(Module):
             axis = tuple(range(x.ndim - len(self.normalized_shape)))
             mean = x.mean(axis)
             center_data = x - mean
-            var = tensor.square(center_data).mean(axis)
-            std_data = center_data / tensor.sqrt(var + self.eps)
+            var = core.square(center_data).mean(axis)
+            std_data = center_data / core.sqrt(var + self.eps)
             self.running_mean *= (1 - self.momentum)
             self.running_mean += self.momentum * mean
             self.running_var *= (1 - self.momentum)
@@ -215,7 +214,7 @@ class LayerNorm(Module):
 
             return std_data * self.scale + self.shift
         else:
-            return (x - self.running_mean) * self.scale / tensor.sqrt(
+            return (x - self.running_mean) * self.scale / core.sqrt(
                 self.running_var + self.eps) + self.shift
 
 
@@ -244,6 +243,6 @@ class RMSNorm(Module):
         init.ones_(self.weight)
 
     def forward(self, x):
-        z = tensor.square(x).mean(self.sum_axis, keepdims=True)
-        z = x / tensor.sqrt(z + self.eps)
+        z = core.square(x).mean(self.sum_axis, keepdims=True)
+        z = x / core.sqrt(z + self.eps)
         return z * self.weight

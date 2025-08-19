@@ -11,7 +11,7 @@ Reference
 '''
 
 from math import sqrt
-from ..tensor import Tensor
+from ..core import Tensor
 
 
 class Optimizer:

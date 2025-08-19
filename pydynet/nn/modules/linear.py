@@ -1,7 +1,7 @@
 from .module import Module
 from ..parameter import Parameter
 from .. import init, functional as F
-from ...tensor import Tensor
+from ...core import Tensor
 from ...special import empty
 from ...cuda import Device
 from ...autograd import no_grad
