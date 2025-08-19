@@ -1,6 +1,6 @@
 import sys
 
-# sys.path.append('../pydynet')
+sys.path.append('../pydynet')
 
 import pydynet as pdn
 import numpy as np
