@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from copy import deepcopy
 
 from ..parameter import Parameter
 from ...tensor import Tensor

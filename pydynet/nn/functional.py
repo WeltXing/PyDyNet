@@ -19,7 +19,7 @@ def embedding(x: tensor.Tensor, weight: tensor.Tensor, padding_idx: int):
     return query
 
 
-class sigmoid(tensor.UnaryOperator):
+class sigmoid(tensor._UnaryOperator):
     '''Sigmoid运算, 我们前向传播避免了溢出问题'''
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
@@ -32,7 +32,7 @@ class sigmoid(tensor.UnaryOperator):
         return self.data * (1 - self.data) * grad
 
 
-class tanh(tensor.UnaryOperator):
+class tanh(tensor._UnaryOperator):
     '''Tanh运算, 我们前向传播避免了溢出问题'''
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
@@ -75,7 +75,7 @@ def log_softmax(x: tensor.Tensor, axis=None, keepdims=False):
         tensor.sum(tensor.exp(x_sub_max), axis=axis, keepdims=keepdims))
 
 
-class __im2col1d(tensor.UnaryOperator):
+class __im2col1d(tensor._UnaryOperator):
 
     def __init__(
         self,
@@ -112,7 +112,7 @@ class __im2col1d(tensor.UnaryOperator):
         return grad_x
 
 
-class __pad1d(tensor.UnaryOperator):
+class __pad1d(tensor._UnaryOperator):
 
     def __init__(self, x: tensor.Tensor, pad_width=0) -> None:
         self.pad_width = pad_width
@@ -208,7 +208,7 @@ def avg_pool1d(
     return col.mean(-1)
 
 
-class __im2col2d(tensor.UnaryOperator):
+class __im2col2d(tensor._UnaryOperator):
 
     def __init__(
         self,
@@ -226,18 +226,6 @@ class __im2col2d(tensor.UnaryOperator):
         super().__init__(x)
 
     def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        # standard
-        # col = self.xp.empty((self.N, self.in_channels, self.kernel_size,
-        #                      self.kernel_size, self.out_h, self.out_w),
-        #                     dtype=x.dtype)
-
-        # for i in range(self.kernel_size):
-        #     i_max = i + self.out_h * self.stride
-        #     for j in range(self.kernel_size):
-        #         j_max = j + self.out_w * self.stride
-        #         col[:, :, i, j] = x.data[:, :, i:i_max:self.stride,
-        #                                  j:j_max:self.stride]
-
         s0, s1, s2, s3 = x.strides
         shape = (x.shape[0], self.in_channels, self.kernel_size,
                  self.kernel_size, self.out_h, self.out_w)
@@ -252,14 +240,6 @@ class __im2col2d(tensor.UnaryOperator):
 
     def grad_fn(self, x: tensor.Tensor, grad: np.ndarray) -> np.ndarray:
         grad_x = self.xp.zeros(x.shape, dtype=self.dtype)
-        # standard
-        # for i in range(self.kernel_size):
-        #     i_max = i + self.out_h * self.stride
-        #     for j in range(self.kernel_size):
-        #         j_max = j + self.out_w * self.stride
-        #         grad_x[:, :, i:i_max:self.stride,
-        #                j:j_max:self.stride] += grad[:, :, i, j]
-
         view = self.xp.lib.stride_tricks.as_strided(
             grad_x,
             shape=self.shape,
@@ -269,7 +249,7 @@ class __im2col2d(tensor.UnaryOperator):
         return grad_x
 
 
-class __pad2d(tensor.UnaryOperator):
+class __pad2d(tensor._UnaryOperator):
 
     def __init__(self, x: tensor.Tensor, pad_width=0) -> None:
         self.pad_width = pad_width

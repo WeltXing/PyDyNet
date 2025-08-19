@@ -258,7 +258,7 @@ class Tensor:
         return abs(self)
 
     def __getitem__(self, key):
-        return get_slice(self, key)
+        return _get_slice(self, key)
 
     def __setitem__(self, key, value):
         '''
@@ -431,7 +431,7 @@ class Tensor:
         return self.device.xp
 
 
-class UnaryOperator(Tensor):
+class _UnaryOperator(Tensor):
     '''
     一元运算算子的基类, 将一个一元函数抽象成类
 
@@ -485,7 +485,7 @@ class UnaryOperator(Tensor):
         return "Tensor({}, op={})".format(self.data, self.__class__.__name__)
 
 
-class BinaryOperator(Tensor):
+class _BinaryOperator(Tensor):
     '''
     二元运算算子的基类, 将一个二元函数抽象成类
 
@@ -550,7 +550,7 @@ class BinaryOperator(Tensor):
         return "Tensor({}, op={})".format(self.data, self.__class__.__name__)
 
 
-class add(BinaryOperator):
+class add(_BinaryOperator):
     '''
     加法算子
 
@@ -569,7 +569,7 @@ class add(BinaryOperator):
         return grad[...]
 
 
-class sub(BinaryOperator):
+class sub(_BinaryOperator):
     '''
     减法算子, 在Tensor类中进行重载
 
@@ -587,7 +587,7 @@ class sub(BinaryOperator):
         return -grad
 
 
-class mul(BinaryOperator):
+class mul(_BinaryOperator):
     '''
     元素级乘法算子, 在Tensor类中进行重载
 
@@ -614,7 +614,7 @@ class mul(BinaryOperator):
         return self.last[0].data * grad
 
 
-class div(BinaryOperator):
+class div(_BinaryOperator):
     '''
     除法算子, 在Tensor类中进行重载
 
@@ -636,7 +636,7 @@ class div(BinaryOperator):
         return -self.data * temp
 
 
-class pow(BinaryOperator):
+class pow(_BinaryOperator):
     '''
     幂运算算子, 在Tensor类中进行重载
 
@@ -658,7 +658,7 @@ class pow(BinaryOperator):
             return self.data * self.xp.log(self.last[0].data) * grad
 
 
-class matmul(BinaryOperator):
+class matmul(_BinaryOperator):
     '''
     矩阵乘法算子, 在Tensor类中进行重载, 张量的矩阵乘法遵从NumPy Matmul的规则.
 
@@ -694,7 +694,7 @@ class matmul(BinaryOperator):
             return grad2[..., 0] if self.expand_b else grad2
 
 
-class abs(UnaryOperator):
+class abs(_UnaryOperator):
     '''
     绝对值算子, 在Tensor类中进行重载
 
@@ -713,7 +713,7 @@ class abs(UnaryOperator):
         return grad * mask
 
 
-class sum(UnaryOperator):
+class sum(_UnaryOperator):
     '''
     求和算子, 在Tensor类中扩展为类方法
 
@@ -750,7 +750,7 @@ class sum(UnaryOperator):
         return self.xp.ones(x.shape, dtype=x.dtype) * grad
 
 
-class mean(UnaryOperator):
+class mean(_UnaryOperator):
     '''
     求均值算子, 在Tensor类中扩展为类方法
 
@@ -781,7 +781,7 @@ class mean(UnaryOperator):
             x.shape, dtype=x.dtype) * grad * self.data.size / x.data.size
 
 
-class max(UnaryOperator):
+class max(_UnaryOperator):
     '''
     求最大值算子, 在Tensor类中扩展为类方法
 
@@ -815,7 +815,7 @@ class max(UnaryOperator):
         return (full_dim_y == x.data).astype(x.dtype) * grad
 
 
-class min(UnaryOperator):
+class min(_UnaryOperator):
     '''
     求最小值算子, 在Tensor类中扩展为类方法
 
@@ -887,7 +887,7 @@ class argmin(Tensor):
             )
 
 
-class exp(UnaryOperator):
+class exp(_UnaryOperator):
     '''指数运算
     
     Example
@@ -903,7 +903,7 @@ class exp(UnaryOperator):
         return self.data * grad
 
 
-class log(UnaryOperator):
+class log(_UnaryOperator):
     '''对数运算
     
     Example
@@ -919,7 +919,7 @@ class log(UnaryOperator):
         return grad / x.data
 
 
-class maximum(BinaryOperator):
+class maximum(_BinaryOperator):
 
     def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         return self.xp.maximum(x.data, y.data)
@@ -928,7 +928,7 @@ class maximum(BinaryOperator):
         return (self.data == x.data) * grad
 
 
-class minimum(BinaryOperator):
+class minimum(_BinaryOperator):
 
     def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
         return self.xp.minimum(x, y)
@@ -937,7 +937,7 @@ class minimum(BinaryOperator):
         return (self.data == x) * grad
 
 
-class sign(UnaryOperator):
+class sign(_UnaryOperator):
 
     def forward_(self, x: Tensor) -> np.ndarray:
         return self.xp.sign(x.data)
@@ -947,7 +947,7 @@ class sign(UnaryOperator):
 
 
 # 非计算函数
-class reshape(UnaryOperator):
+class reshape(_UnaryOperator):
     '''
     张量形状变换算子, 在Tensor中进行重载
 
@@ -968,7 +968,7 @@ class reshape(UnaryOperator):
         return grad.reshape(x.shape)
 
 
-class transpose(UnaryOperator):
+class transpose(_UnaryOperator):
     '''
     张量转置算子, 在Tensor中进行重载(Tensor.T和Tensor.transpose)
 
@@ -991,7 +991,7 @@ class transpose(UnaryOperator):
         return grad.transpose(tuple(np.argsort(self.axes)))
 
 
-class swapaxes(UnaryOperator):
+class swapaxes(_UnaryOperator):
     '''
     张量交换轴算子
 
@@ -1015,7 +1015,7 @@ class swapaxes(UnaryOperator):
         return grad.swapaxes(self.axis1, self.axis2)
 
 
-class get_slice(UnaryOperator):
+class _get_slice(_UnaryOperator):
     '''
     切片算子, 为Tensor类提供索引和切片接口
 

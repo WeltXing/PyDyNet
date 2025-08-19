@@ -1,5 +1,3 @@
-from typing import Any
-from functools import wraps
 import numpy as np
 import warnings
 
@@ -36,7 +34,7 @@ def set_device(device: int) -> None:
 
 class Device:
 
-    def __init__(self, device: Any = None) -> None:
+    def __init__(self, device=None) -> None:
         if isinstance(device, str):
             if device == "cpu":
                 self.device = "cpu"
@@ -78,7 +76,7 @@ class Device:
         else:
             return "Device(type='cuda', index={})".format(self.device_id)
 
-    def __eq__(self, device: Any) -> bool:
+    def __eq__(self, device) -> bool:
         if not isinstance(device, Device):
             device = Device(device)
         if self.device == "cpu":
