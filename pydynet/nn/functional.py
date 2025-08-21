@@ -20,30 +20,12 @@ def embedding(x: tensor.Tensor, weight: tensor.Tensor, padding_idx: int):
     return query
 
 
-class sigmoid(tensor._UnaryOperator):
-    '''Sigmoid运算, 我们前向传播避免了溢出问题'''
-
-    def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        sigmoid = self.xp.zeros(x.shape, dtype=x.dtype)
-        sigmoid[x.data > 0] = 1 / (1 + self.xp.exp(-x.data[x.data > 0]))
-        sigmoid[x.data <= 0] = 1 - 1 / (1 + self.xp.exp(x.data[x.data <= 0]))
-        return sigmoid
-
-    def grad_fn(self, x: tensor.Tensor, grad: np.ndarray) -> np.ndarray:
-        return self.data * (1 - self.data) * grad
+def sigmoid(x: tensor.Tensor):
+    return tensor.sigmoid(x)
 
 
-class tanh(tensor._UnaryOperator):
-    '''Tanh运算, 我们前向传播避免了溢出问题'''
-
-    def forward_(self, x: tensor.Tensor) -> np.ndarray:
-        tanh = self.xp.zeros(x.shape, dtype=x.dtype)
-        tanh[x.data > 0] = 2 / (1 + self.xp.exp(-2 * x.data[x.data > 0])) - 1
-        tanh[x.data <= 0] = 1 - 2 / (1 + self.xp.exp(2 * x.data[x.data <= 0]))
-        return tanh
-
-    def grad_fn(self, x: tensor.Tensor, grad: np.ndarray) -> np.ndarray:
-        return (1 - self.data**2) * grad
+def tanh(x: tensor.Tensor):
+    return tensor.tanh(x)
 
 
 def relu(x: tensor.Tensor):

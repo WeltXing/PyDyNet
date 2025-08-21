@@ -11,13 +11,13 @@ class Graph:
     size = 0
 
     @classmethod
-    def add_node(cls, node):
+    def _add_node(cls, node):
         '''添加图节点'''
         cls.node_list.append(node)
         cls.size += 1
 
     @classmethod
-    def free_node(cls, node):
+    def _free_node(cls, node):
         node.last.clear()
 
         index = cls.node_list.index(node)
@@ -87,7 +87,7 @@ class Tensor:
             with self.device:
                 self.grad = self.xp.zeros(self.shape, dtype=dtype)
             self.last: list[Tensor] = list()
-            Graph.add_node(self)
+            Graph._add_node(self)
         else:
             self.grad = None
 
@@ -249,72 +249,66 @@ class Tensor:
     def __getitem__(self, key):
         return _get_slice(self, key)
 
-    def __setitem__(self, key, value):
-        if is_grad_enable() and self.requires_grad:
+    def _inplace(self, *others: Tensor, func):
+        if self.requires_grad and is_grad_enable():
             raise ValueError(
                 "In-place operation is forbidden in node requires grad.")
-        if isinstance(key, Tensor):
-            key = key.data
+
+        others = tuple(other.data if isinstance(other, Tensor) else other
+                       for other in others)
 
         with self.device:
-            self.data[key] = value.data if isinstance(value, Tensor) else value
-
-    def __inplace(self, other, func):
-        if self.requires_grad:
-            raise ValueError(
-                "In-place operation is forbidden in node requires grad.")
-        if isinstance(other, Tensor):
-            other = other.data
-        with self.device:
-            self.data[...] = func(self.data, other)
+            func(*others)
         return self
 
+    def __setitem__(self, key, value):
+        return self._inplace(key, value, func=self.data.__setitem__)
+
     def __iadd__(self, other):
-        return self.__inplace(other, lambda x, y: x + y)
+        return self._inplace(other, func=self.data.__iadd__)
 
     def __isub__(self, other):
-        return self.__inplace(other, lambda x, y: x - y)
+        return self._inplace(other, func=self.data.__isub__)
 
     def __imul__(self, other):
-        return self.__inplace(other, lambda x, y: x * y)
+        return self._inplace(other, func=self.data.__imul__)
 
     def __itruediv__(self, other):
-        return self.__inplace(other, lambda x, y: x / y)
+        return self._inplace(other, func=self.data.__itruediv__)
 
     def __imatmul__(self, other):
-        return self.__inplace(other, lambda x, y: x @ y)
+        return self._inplace(other, func=self.data.__imatmul__)
 
-    def __compare(self, other, func):
-        if isinstance(other, Tensor):
-            other = other.data
-
+    def _compare(self, other, func):
         with self.device:
-            return Tensor(func(self.data, other), self.xp.bool_, None,
-                          self.device, False)
+            return Tensor(
+                func(self.data,
+                     other.data if isinstance(other, Tensor) else other),
+                self.xp.bool_, None, self.device, False)
 
     @no_grad()
     def eq(self, other):
-        return self.__compare(other, lambda x, y: x == y)
+        return self._compare(other, lambda x, y: x == y)
 
     @no_grad()
     def ne(self, other):
-        return self.__compare(other, lambda x, y: x != y)
+        return self._compare(other, lambda x, y: x != y)
 
     @no_grad()
     def __lt__(self, other):
-        return self.__compare(other, lambda x, y: x < y)
+        return self._compare(other, lambda x, y: x < y)
 
     @no_grad()
     def __le__(self, other):
-        return self.__compare(other, lambda x, y: x <= y)
+        return self._compare(other, lambda x, y: x <= y)
 
     @no_grad()
     def __gt__(self, other):
-        return not self.__le__(other)
+        return self._compare(other, lambda x, y: x > y)
 
     @no_grad()
     def __ge__(self, other):
-        return not self.__lt__(other)
+        return self._compare(other, lambda x, y: x >= y)
 
     def backward(self, retain_graph: bool = False):
         '''
@@ -364,7 +358,7 @@ class Tensor:
 
                 # if not retain graph and node is not leaf, free it
                 if not retain_graph and not node.is_leaf:
-                    Graph.free_node(node)
+                    Graph._free_node(node)
 
     def _build_edge(self, node: Tensor):
         node.last.append(self)
@@ -397,8 +391,8 @@ class Tensor:
     def cpu(self):
         return self.to("cpu")
 
-    def cuda(self):
-        return self.to("cuda:0")
+    def cuda(self, id: int = 0):
+        return self.to(f"cuda:{id}")
 
     @property
     def xp(self):
@@ -809,7 +803,7 @@ class maximum(_BinaryOperator):
 class minimum(_BinaryOperator):
 
     def forward_(self, x: Tensor, y: Tensor) -> np.ndarray:
-        return self.xp.minimum(x, y)
+        return self.xp.minimum(x.data, y.data)
 
     def grad_fn(self, x: Tensor, grad) -> np.ndarray:
         return (self.data == x) * grad
@@ -983,3 +977,29 @@ class concat(Tensor):
         slc = [slice(None)] * grad.ndim
         slc[self.axis] = slice(start, end)
         return grad[tuple(slc)]
+
+
+class sigmoid(_UnaryOperator):
+    '''Sigmoid运算, 我们前向传播避免了溢出问题'''
+
+    def forward_(self, x: Tensor) -> np.ndarray:
+        sigmoid = self.xp.zeros(x.shape, dtype=x.dtype)
+        sigmoid[x.data > 0] = 1 / (1 + self.xp.exp(-x.data[x.data > 0]))
+        sigmoid[x.data <= 0] = 1 - 1 / (1 + self.xp.exp(x.data[x.data <= 0]))
+        return sigmoid
+
+    def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
+        return self.data * (1 - self.data) * grad
+
+
+class tanh(_UnaryOperator):
+    '''Tanh运算, 我们前向传播避免了溢出问题'''
+
+    def forward_(self, x: Tensor) -> np.ndarray:
+        tanh = self.xp.zeros(x.shape, dtype=x.dtype)
+        tanh[x.data > 0] = 2 / (1 + self.xp.exp(-2 * x.data[x.data > 0])) - 1
+        tanh[x.data <= 0] = 1 - 2 / (1 + self.xp.exp(2 * x.data[x.data <= 0]))
+        return tanh
+
+    def grad_fn(self, x: Tensor, grad: np.ndarray) -> np.ndarray:
+        return (1 - self.data**2) * grad

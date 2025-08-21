@@ -6,14 +6,15 @@
 
 [![Downloads](https://pepy.tech/badge/pydynet)](https://pepy.tech/project/pydynet)
 [![Downloads](https://static.pepy.tech/personalized-badge/pydynet?period=month&units=international_system&left_color=grey&right_color=orange&left_text=downloads/month)](https://pepy.tech/project/pydynet)
-![](https://img.shields.io/pypi/l/pydynet)
-![](https://img.shields.io/pypi/implementation/numpy)
-![](https://img.shields.io/github/stars/Kaslanarian/PyDyNet?style=social)
-![](https://img.shields.io/github/forks/Kaslanarian/PyDyNet?style=social)
+![x](https://img.shields.io/pypi/l/pydynet)
+![x](https://img.shields.io/pypi/implementation/numpy)
+![x](https://img.shields.io/github/stars/Kaslanarian/PyDyNet?style=social)
+![x](https://img.shields.io/github/forks/Kaslanarian/PyDyNet?style=social)
 
 ## Towards Large Language Model
 
 **2025.8.12**: 实现了纯推理的llama3 (6-layer Transformer, vocab-size=32000). 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
+
 ```bash
 >>> python .\llama\infer.py
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
@@ -53,7 +54,7 @@ python setup.py install
 
 ## Example
 
-[tests](./tests)中是一些例子。运行`python examples/XXX.py`即可:
+[examples](./examples/)中是一些例子。运行`python examples/XXX.py`即可:
 
 ### AutoDiff
 
@@ -64,7 +65,6 @@ python setup.py install
 以及一个多元凸函数的例子: [autodiff2d.py](examples/autodiff2d.py)
 
 <img src="imgs/ad2d.png" alt="ad2" style="zoom:67%;" />
-
 
 ### MLP & LeNet
 
