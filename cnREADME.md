@@ -1,6 +1,6 @@
 # PyDyNet：NumPy-based Dynamic Deep Learning Framework
 
-Chinese README: [cnREADME.md](./cnREADME.md)
+**PyDyNet已被多个技术公众号和社区分享**：[居然用Numpy实现了一个深度学习框架](https://segmentfault.com/a/1190000042108301).
 
 [![Downloads](https://pepy.tech/badge/pydynet)](https://pepy.tech/project/pydynet)
 [![Downloads](https://static.pepy.tech/personalized-badge/pydynet?period=month&units=international_system&left_color=grey&right_color=orange&left_text=downloads/month)](https://pepy.tech/project/pydynet)
@@ -11,11 +11,10 @@ Chinese README: [cnREADME.md](./cnREADME.md)
 
 ## Towards Large Language Model
 
-**In the summer of 2025, I restart the development of PyDyNet after two years.** PyDyNet implemented a pure inference version of Llama3 (6-layer Transformer, vocab-size=32000). The implementation is inspired by the NumPy version and dataset available [here](https://github.com/likejazz/llama3.np). To run it, download the dataset into the `llama` folder and execute:
+**2025.8.12**: 实现了纯推理的llama3 (6-layer Transformer, vocab-size=32000). 参考了[这里](https://github.com/likejazz/llama3.np)的NumPy实现和数据集. 将数据集下载到`llama`文件夹即可运行:
 
 ```bash
 >>> python -m llama.infer
-
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
 Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick it up. But then, he accidentally knocked over a pile of clothe and they fell on him. Timmy wa okay, but he felt bad.
 Hi mom saw what happened and said, "Timmy, you need to be more careful. You could have hurt yourself." Timmy felt bad and said sorry. Hi mom hugged him and said, "It' okay, accident happen. Let' clean up the laundry together." Timmy learned that it' important to be careful and help out when you need it.
@@ -23,11 +22,9 @@ Hi mom saw what happened and said, "Timmy, you need to be more careful. You coul
 Token count: 262, elapsed: 0.87s, 300 tokens/s
 ```
 
-This implementation is not optimized for speed, but it serves as a reference for implementing large language models in PyDyNet. **I plan to implement some modern model such as CLIP in the future, and I welcome contributions from anyone interested in this project.**
-
 ## Overview
 
-PyDyNet is a neural network framework implemented entirely in NumPy (with CuPy support since version 0.0.7, using the same API). Its syntax is inspired by PyTorch, and its structure is as follows:
+PyDyNet也是纯NumPy(0.0.7版本后加入CuPy，其用法和NumPy一致)实现的神经网络，语法受PyTorch的启发，大致结构如下：
 
 ```mermaid
 graph LR
@@ -43,7 +40,7 @@ graph LR
    A --> GD(Optimizer:<br> SGD, Adam, etc) ---> LS(lr_scheduler: <br>StepLR, etc)---> Mission
 ```
 
-Dashed lines indicate that users can disable automatic differentiation using `no_grad`.
+虚线表示用户可以通过`no_grad`来关闭自动微分功能.
 
 ## Install
 
@@ -53,62 +50,60 @@ cd PyDyNet
 python setup.py install
 ```
 
-We are actively working on a pip installation option.
-
 ## Example
 
-Examples can be found in the [examples/pydynet](./examples/pydynet) directory, with equivalent PyTorch implementations in [examples/pytorch](./examples/pytorch). To run an example, use:
+[examples/pydynet](./examples/pydynet)中是一些例子，[examples/pytorch](./examples/pytorch)给出等价的pytorch实现. 运行`python examples.pydynet.xxx`即可:
 
-```bash
-python examples.pydynet.xxx
-```
+### AutoDiff
 
-### Automatic Differentiation
-
-The example [autodiff1d.py](examples/pydynet/autodiff1d.py) demonstrates automatic differentiation by performing gradient descent on a one-dimensional convex function:
+[autodiff1d.py](examples/pydynet/autodiff1d.py)利用自动微分，对一个一维凸函数进行梯度下降：
 
 <img src="imgs/ad1d.png" alt="ad1" style="zoom:67%;" />
 
-A multi-variable convex function example is provided in [autodiff2d.py](examples/pydynet/autodiff2d.py):
+以及一个多元凸函数的例子: [autodiff2d.py](examples/pydynet/autodiff2d.py)
 
 <img src="imgs/ad2d.png" alt="ad2" style="zoom:67%;" />
 
 ### MLP & LeNet
 
-The example [mlp_cnn.py](examples/pydynet/mnist.py) uses MLP and LeNet to classify MNIST digits. The training and testing accuracies are shown below:
+[mlp_cnn.py](examples/pydynet/mnist.py)使用MLP和LeNet对MNIST进行分类. 训练准确率和测试准确率：
 
 <img src="imgs/mlp_cnn.png" alt="dnn" style="zoom:67%;" />
 
-### Dropout & Batch Normalization
+### Dropout & BN
 
-The example [mlp_dropout_bn.py](examples/pydynet/dropout_bn.py) compares the performance of three networks on the `fetch_olivetti_faces` dataset (64×64 pixel images):
+[mlp_dropout_bn.py](examples/pydynet/dropout_bn.py)使用三种网络对`fetch_olivetti_faces`人脸(64×64)数据集进行分类并进行性能对比：
 
-1. Three-layer MLP;
-2. Three-layer MLP with Dropout;
-3. Three-layer MLP with Batch Normalization.
+1. 三层MLP;
+2. 三层MLP + Dropout;
+3. 三层MLP + BatchNormalization.
+
+学习效果对比：
 
 <img src="imgs/dropout_bn.png" alt="cnn" style="zoom:67%;" />
 
-### Recurrent Neural Network (RNN)
+### RNN
 
-The example [ts_prediction.py](examples/pydynet/ts_prediction.py) demonstrates time series prediction using a GRU:
+[ts_prediction](examples/pydynet/ts_prediction.py)中是一个用GRU做时序预测例子:
 
 <img src="imgs/rnn.png" alt="RNN" style="zoom:67%;" />
 
 ### Transformer
 
-The example [transformer.py](examples/pydynet/transformer.py) shows how to train a text classification model using a Transformer. The training results are as follows:
+[transformer.py](examples/pydynet/transformer.py)中是一个用Transformer训练文本分类模型的例子. 训练结果:
 
 <img src="imgs/transformer.png" alt="transformer" style="zoom:67%;" />
 
-> Dataset (CoLA) link: <https://nyu-mll.github.io/CoLA/cola_public_1.1.zip>
+> 数据集 (CoLA) 链接: <https://nyu-mll.github.io/CoLA/cola_public_1.1.zip>
 
-## Cuda Acceleration
+## cuda加速
 
-PyDyNet supports CUDA acceleration through CuPy. To use it, simply install CuPy and use the same API as NumPy. We compare the performance of PyDyNet with CuPy and NumPy as follows on **Nvidia GeForce RTX 4090**:
+在训练batch size为256, 测试batch size为1024情况下，模型在CPU和GPU上的训练速度比较:
 
 |      Network structure         |      Dataset      | CPU time (s) per epoch | GPU time (s) per epoch |
 | :-----------------: | :---------------: | :--------------------: | :--------------------: |
 |    3-layer MLP     | MNIST (80000×574) |      7.256±0.138      |       1.203±.0181       |
 |        LeNet        | MNIST (80000×574) |     239.664±2.108      |      2.841±0.026      |
 | 1-layer Transformer (dim=512, head=4) | CoLA (8551×45×64) |      17.503±0.251      |      1.075±0.002       |
+
+设备: Nvidia GeForce RTX 4090.
