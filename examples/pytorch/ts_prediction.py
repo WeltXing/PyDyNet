@@ -3,12 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-import sys
-
-sys.path.append('../pydynet')
-
-import pydynet as pdn
-from pydynet import Tensor
+import torch
 import pydynet.nn as nn
 from pydynet.optim import Adam
 
@@ -27,8 +22,8 @@ def windowize(y, input_len, horizon=1, stride=1, step=1):
     X = y[np.array(idx_inputs)]
     Y = y[np.array(idx_targets)]
     return (
-        Tensor(X[..., np.newaxis], dtype=np.float32),
-        Tensor(Y, dtype=np.float32),
+        torch.tensor(X[..., np.newaxis]),
+        torch.tensor(Y),
     )
 
 
@@ -45,7 +40,6 @@ def f(t):
 
 steps = np.arange(0, 100, .05)
 X, Y = windowize(f(steps), input_len=TIME_STEP, horizon=1, stride=1, step=1)
-print(X.shape)
 
 X_train, X_test, Y_train, Y_test = train_test_split(
     X,
@@ -66,7 +60,7 @@ class RNN(nn.Module):
             batch_first=True,
             dtype=np.float32,
         )
-        self.out = nn.Linear(H_SIZE, 1, dtype=np.float32)
+        self.out = nn.Linear(H_SIZE, 1)
 
     def forward(self, x, h_state):
         _, h_state = self.rnn(x, h_state)
@@ -105,8 +99,10 @@ for step in bar:
     optimizer.step()
 
     plt.figure(figsize=(5, 3))
+    plt.grid()
+    
     rnn.eval()
-    with pdn.no_grad():
+    with torch.no_grad():
         test_loss = criterion(rnn(X_test, h_state), Y_test)
 
         plt.plot(visual_steps[TIME_STEP:],

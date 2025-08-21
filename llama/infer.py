@@ -1,6 +1,4 @@
 import sys, time, argparse
-
-sys.path.append('../pydynet')
 from llama.tokenizer import Tokenizer
 from llama.model import Llama
 

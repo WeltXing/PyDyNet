@@ -1,22 +1,15 @@
-import numpy as np
-
 import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_olivetti_faces
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-import sys
-
-sys.path.append('../pydynet')
-
+import numpy as np
 import pydynet as pdn
 import pydynet.nn.functional as F
 import pydynet.nn as nn
-from pydynet.optim import Adam, SGD
+from pydynet.optim import Adam
 from pydynet.data import data_loader
-
-np.random.seed(42)
 
 data_X, data_y = fetch_olivetti_faces(return_X_y=True)
 print(data_X.shape)
@@ -25,6 +18,7 @@ train_X, test_X, train_y, test_y = train_test_split(
     data_y,
     train_size=0.8,
     stratify=data_y,
+    random_state=42,
 )
 scaler = MinMaxScaler()
 train_X = scaler.fit_transform(train_X)
@@ -70,8 +64,10 @@ class DNN_BN(DNN):
         return self.fc3(x)
 
 
+np.random.seed(42)
 use_cuda = True
-device = 'cuda:0' if pdn.cuda.is_available() and use_cuda else 'cpu'
+device = f'cuda:{pdn.cuda.device_count() - 1}' if pdn.cuda.is_available(
+) else 'cpu'
 
 net1 = DNN().to(device)
 net2 = DNN_dropout().to(device)
@@ -106,20 +102,17 @@ for epoch in bar:
 
         output1 = net1(input_)
         l1 = loss(output1, label)
-        optim1.zero_grad()
-        l1.backward()
-        optim1.step()
-
         output2 = net2(input_)
         l2 = loss(output2, label)
-        optim2.zero_grad()
-        l2.backward()
-        optim2.step()
-
         output3 = net3(input_)
         l3 = loss(output3, label)
+
+        optim1.zero_grad()
+        optim2.zero_grad()
         optim3.zero_grad()
-        l3.backward()
+        (l1 + l2 + l3).backward()
+        optim1.step()
+        optim2.step()
         optim3.step()
 
     net1.eval()
@@ -135,9 +128,9 @@ for epoch in bar:
             pred2 = net2(input_).argmax(-1)
             pred3 = net3(input_).argmax(-1)
 
-            train_right[0] += (pred1.data == label.data).sum().item()
-            train_right[1] += (pred2.data == label.data).sum().item()
-            train_right[2] += (pred3.data == label.data).sum().item()
+            train_right[0] += pred1.eq(label).sum().item()
+            train_right[1] += pred2.eq(label).sum().item()
+            train_right[2] += pred3.eq(label).sum().item()
 
         train_acc = np.array(train_right) / len(train_X)
 
@@ -147,9 +140,9 @@ for epoch in bar:
             net3(test_X_cuda).argmax(-1),
         )
         test_acc = np.array([
-            (pred1.data == test_y_cuda.data).mean().item(),
-            (pred2.data == test_y_cuda.data).mean().item(),
-            (pred3.data == test_y_cuda.data).mean().item(),
+            pred1.eq(test_y_cuda.data).mean().item(),
+            pred2.eq(test_y_cuda.data).mean().item(),
+            pred3.eq(test_y_cuda.data).mean().item(),
         ])
 
         bar.set_postfix(
@@ -237,4 +230,4 @@ plt.title("Test Accuracy on Olivetti Faces Dataset")
 plt.legend()
 plt.tight_layout()
 
-plt.savefig("imgs/dropout_BN.png")
+plt.savefig("imgs/dropout_bn.png")

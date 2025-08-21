@@ -1,12 +1,7 @@
-import sys
-
-sys.path.append('../pydynet')
-
 from os.path import join
 from tqdm import tqdm
 
 import pydynet as pdn
-from pydynet.tensor import Tensor
 import pydynet.nn as nn
 import pydynet.nn.functional as F
 from pydynet.optim import Adam
@@ -142,11 +137,11 @@ def sinusoidal_positional_encoding(max_len: int, d_model: int):
     pe[:, 0::2] = np.sin(position * div_term)
     pe[:, 1::2] = np.cos(position * div_term)
 
-    return Tensor(pe.astype(np.float32))
+    return pdn.Tensor(pe.astype(np.float32))
 
 
 @pdn.no_grad()
-def construct_mask(x: Tensor, padding_idx=0):
+def construct_mask(x: pdn.Tensor, padding_idx=0):
     mask = x.eq(padding_idx)  # [batch_size, seq_len]
     return pdn.unsqueeze(mask, (1, 2)).astype(
         np.float32)  # [batch_size, 1, 1, seq_len]
@@ -172,8 +167,8 @@ class Transformer(nn.Module):
             padding_idx=0,
             dtype=np.float32,
         )
-        self.position_embedding = nn.Parameter(sinusoidal_positional_encoding(
-            max_length, embed_size), False)
+        self.position_embedding = nn.Parameter(
+            sinusoidal_positional_encoding(max_length, embed_size), False)
 
         self.layers = nn.ModuleList([
             TransformerBlock(
@@ -210,8 +205,8 @@ if __name__ == "__main__":
     y[y == 0] = -1
 
     train_X, test_X, train_y, test_y = train_test_split(
-        Tensor(X),
-        Tensor(y),
+        pdn.Tensor(X),
+        pdn.Tensor(y),
         train_size=0.8,
         stratify=y,
         shuffle=True,

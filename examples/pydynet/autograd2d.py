@@ -1,17 +1,11 @@
-import sys
-
-sys.path.append('../pydynet')
-
 import pydynet as pdn
 import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(42)
 
-device = 'cpu'
-# device = 'cuda:0'
-# device = 'cuda:1'
-
+device = f'cuda:{pdn.cuda.device_count() - 1}' if pdn.cuda.is_available(
+) else 'cpu'
 
 x = np.random.randn(2)
 A = pdn.Tensor([
