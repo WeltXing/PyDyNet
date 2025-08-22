@@ -69,7 +69,7 @@ We are actively working on a pip installation option.
 Examples can be found in the [examples/pydynet](./examples/pydynet) directory, with equivalent PyTorch implementations in [examples/pytorch](./examples/pytorch). To run an example, use:
 
 ```bash
-python examples.pydynet.xxx
+python -m examples.pydynet.xxx
 ```
 
 ### Automatic Differentiation
