@@ -14,7 +14,7 @@ setuptools.setup(
         'pydynet/core'
     ],
     license='MIT License',
-    install_requires=['numpy'],
+    install_requires=['numpy>=2.0.0'],
     long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type="text/markdown",
     url='https://github.com/WeltXing/PyDyNet',

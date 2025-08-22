@@ -1,6 +1,6 @@
 import sys, time, argparse
-from llama.tokenizer import Tokenizer
-from llama.model import Llama
+from .tokenizer import Tokenizer
+from .model import Llama
 
 import pydynet as pdn
 import numpy as np
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     max_batch_size: int = 1
     datatype = np.float32
 
-    tokenizer = Tokenizer("llama/data/tokenizer.model.np")
+    tokenizer = Tokenizer("llm/llama/data/tokenizer.model.np")
     model = load_model(
         Llama(vocab_size,
               dim,
@@ -66,7 +66,7 @@ if __name__ == '__main__':
               max_seq_len,
               max_batch_size,
               n_layers,
-              dtype=datatype), "llama/data/stories15M.model.npz")
+              dtype=datatype), "llm/llama/data/stories15M.model.npz")
 
     # If cuda is available
     if args.cuda and pdn.cuda.is_available():

@@ -11,10 +11,10 @@ Chinese README: [cnREADME.md](./cnREADME.md)
 
 ## Towards Large Language Model
 
-**In the summer of 2025, I restart the development of PyDyNet after two years.** PyDyNet implemented a pure inference version of Llama3 (6-layer Transformer, vocab-size=32000). The implementation is inspired by the NumPy version and dataset available [here](https://github.com/likejazz/llama3.np). To run it, download the dataset into the `llama` folder and execute:
+**In the summer of 2025, I restart the development of PyDyNet after two years.** PyDyNet implemented a pure inference version of Llama3 (6-layer Transformer, vocab-size=32000). The implementation is inspired by the NumPy version and dataset available [here](https://github.com/likejazz/llama3.np). To run it, download the dataset into the `llm/llama` folder and execute:
 
 ```bash
->>> python -m llama.infer
+>>> python -m llm.llama.infer
 
 There was a boy named Timmy. He loved to play with hi toy and run around outside. One day, Timmy' mom asked him to help her with the laundry. Timmy didn't want to help because he wanted to play. But hi mom said, "Timmy, you need to help me. It' important to help out."
 Timmy didn't want to help, but he knew he had to. So, he put on hi shoe and went outside to help hi mom. A they were folding the clothe, Timmy saw a big pile of laundry on the floor. He wanted to help, so he started to pick it up. But then, he accidentally knocked over a pile of clothe and they fell on him. Timmy wa okay, but he felt bad.
@@ -23,7 +23,16 @@ Hi mom saw what happened and said, "Timmy, you need to be more careful. You coul
 Token count: 262, elapsed: 0.87s, 300 tokens/s
 ```
 
-This implementation is not optimized for speed, but it serves as a reference for implementing large language models in PyDyNet. **I plan to implement some modern model such as CLIP in the future, and I welcome contributions from anyone interested in this project.**
+We also implemented a pure inference version of CLIP, inspired by the NumPy version and dataset available [NPCLIP](https://github.com/99991/NPCLIP). To run it, imigrate `data` folder of `MPCLIP` into `llm/clip` folder and execute: 
+
+```bash
+>>> python -m llm.clip.infer
+Label probs: [0.000953   0.48176003 0.51728696]
+```
+
+for the following image and query ["a fish", "a dog", "a cat"]
+
+<img src="llm/clip/picture.png" alt="cat_dog" style="zoom:67%;" />
 
 ## Overview
 
