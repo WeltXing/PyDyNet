@@ -32,7 +32,7 @@ Label probs: [0.000953   0.48176003 0.51728696]
 
 for the following image and query ["a fish", "a dog", "a cat"]
 
-<img src="llm/clip/picture.png" alt="cat_dog" width="200px" />
+<img src="llm/clip/picture.png" alt="cat_dog" width="400px" />
 
 ## Overview
 
