@@ -56,13 +56,19 @@ Dashed lines indicate that users can disable automatic differentiation using `no
 
 ## Install
 
+Just
+
+```bash
+pip install pydynet
+```
+
+or
+
 ```bash
 git clone https://github.com/Kaslanarian/PyDyNet
 cd PyDyNet
 python setup.py install
 ```
-
-We are actively working on a pip installation option.
 
 ## Example
 
