@@ -1,44 +1,10 @@
 import sys, time, argparse
 from .tokenizer import Tokenizer
 from .model import Llama
+from .io import load_model, load_finetuned_parameters
 
 import pydynet as pdn
 import numpy as np
-
-
-@pdn.no_grad()
-def load_model(llama: Llama, model_path: str) -> Llama:
-    weight = np.load(model_path)
-
-    llama.tok_embedding.weight.data[...] = weight['model.embed_tokens.weight']
-    llama.lm_head.weight.data[...] = weight['lm_head.weight'].T
-
-    for i in range(llama.n_layers):
-        (
-            llama.layers[i].attention.Q.weight.data[...],
-            llama.layers[i].attention.K.weight.data[...],
-            llama.layers[i].attention.V.weight.data[...],
-            llama.layers[i].attention.O.weight.data[...],
-            llama.layers[i].ffn.up.weight.data[...],
-            llama.layers[i].ffn.gate.weight.data[...],
-            llama.layers[i].ffn.down.weight[...],
-            llama.layers[i].input_norm.weight.data[...],
-            llama.layers[i].post_attn_norm.weight.data[...],
-        ) = (
-            weight[f'model.layers.{i}.self_attn.q_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.k_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.v_proj.weight'].T,
-            weight[f'model.layers.{i}.self_attn.o_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.up_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.gate_proj.weight'].T,
-            weight[f'model.layers.{i}.mlp.down_proj.weight'].T,
-            weight[f'model.layers.{i}.input_layernorm.weight'],
-            weight[f'model.layers.{i}.post_attention_layernorm.weight'],
-        )
-
-        llama.norm.weight.data[...] = weight['model.norm.weight']
-
-    return llama
 
 
 if __name__ == '__main__':
@@ -46,6 +12,8 @@ if __name__ == '__main__':
         description="Prompt input, e.g. There was a boy")
     parser.add_argument("--prompt", type=str, default='There was a boy')
     parser.add_argument("--cuda", action='store_true')
+    parser.add_argument("--finetuned", type=str, default=None,
+                        help="Optional finetuned parameter file (.npz)")
     args = parser.parse_args()
 
     dim: int = 288  # D
@@ -67,6 +35,9 @@ if __name__ == '__main__':
               max_batch_size,
               n_layers,
               dtype=datatype), "llm/llama/data/stories15M.model.npz")
+
+    if args.finetuned is not None:
+        model = load_finetuned_parameters(model, args.finetuned)
 
     # If cuda is available
     if args.cuda and pdn.cuda.is_available():

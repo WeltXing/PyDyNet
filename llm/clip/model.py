@@ -162,23 +162,82 @@ class TextEncoder(nn.Module):
 
 class CLIP(nn.Module):
 
-    def __init__(self):
+    def __init__(
+        self,
+        image_dim: int = 768,
+        image_heads: int = 12,
+        image_mlp_dim: int = 3072,
+        image_patch: int = 32,
+        image_layers: int = 12,
+        text_dim: int = 512,
+        text_heads: int = 8,
+        text_mlp_dim: int = 2048,
+        text_layers: int = 12,
+        final_dim: int = 512,
+        vocab_size: int = 49408,
+        vision_tokens: int = 50,
+        text_tokens: int = 77,
+    ):
         super().__init__()
-        self.class_embed = nn.Parameter(pdn.randn(1, 1, 768, dtype=np.float32))
-        self.v_pos_emb = nn.Parameter(pdn.randn(50, 768, dtype=np.float32))
-        self.t_pos_emb = nn.Parameter(pdn.randn(77, 512, dtype=np.float32))
-        self.image_encoder = ImageEncoder(768, 12, 3072, 32, 12, 512)
-        self.text_encoder = TextEncoder(512, 8, 2048, 12, 512, 49408)
+        self.class_embed = nn.Parameter(
+            pdn.randn(1, 1, image_dim, dtype=np.float32))
+        self.v_pos_emb = nn.Parameter(
+            pdn.randn(vision_tokens, image_dim, dtype=np.float32))
+        self.t_pos_emb = nn.Parameter(
+            pdn.randn(text_tokens, text_dim, dtype=np.float32))
+
+        self.image_encoder = ImageEncoder(image_dim, image_heads, image_mlp_dim,
+                                          image_patch, image_layers, final_dim)
+        self.text_encoder = TextEncoder(text_dim, text_heads, text_mlp_dim,
+                                        text_layers, final_dim, vocab_size)
         self.scale = 1
 
     def forward(self, img, idx):
         img_feature = self.image_encoder(img, self.class_embed, self.v_pos_emb)
         txt_feature = self.text_encoder(idx, self.t_pos_emb)
 
-        norm_img = pdn.sqrt(pdn.square(img_feature).sum(1, keepdims=True))
-        norm_txt = pdn.sqrt(pdn.square(txt_feature).sum(1, keepdims=True))
+        norm_img = pdn.sqrt(pdn.square(img_feature).sum(1, keepdims=True) + 1e-12)
+        norm_txt = pdn.sqrt(pdn.square(txt_feature).sum(1, keepdims=True) + 1e-12)
 
         img_feature = img_feature / norm_img
         txt_feature = txt_feature / norm_txt
         logits_per_image = self.scale * img_feature @ txt_feature.T
         return logits_per_image
+
+    def set_trainable_parameters(self, trainable_prefixes=("text_encoder", )):
+        trainable_count, frozen_count = 0, 0
+        for name, param in self._parameters.items():
+            is_trainable = any(name.startswith(prefix)
+                               for prefix in trainable_prefixes)
+            param.requires_grad = is_trainable
+            if is_trainable:
+                trainable_count += 1
+            else:
+                frozen_count += 1
+        return trainable_count, frozen_count
+
+    def finetune_step(self,
+                      image,
+                      text_tokens,
+                      target_ids,
+                      optimizer,
+                      criterion=None):
+        if criterion is None:
+            criterion = nn.CrossEntropyLoss()
+
+        self.train(True)
+        optimizer.zero_grad()
+
+        logits = self(image, text_tokens)
+        B, K = logits.shape
+        logits_2d = logits.reshape(B, K)
+        targets = pdn.Tensor(
+            np.asarray(target_ids).reshape(-1),
+            dtype=np.int64,
+            device=logits.device,
+        )
+
+        loss = criterion(logits_2d, targets)
+        loss.backward()
+        optimizer.step()
+        return loss.item()

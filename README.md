@@ -23,11 +23,35 @@ Hi mom saw what happened and said, "Timmy, you need to be more careful. You coul
 Token count: 262, elapsed: 0.87s, 300 tokens/s
 ```
 
+For parameter fine-tuning, run:
+
+```bash
+python -m llm.llama.finetune --text "A short domain sample for adaptation" --steps 30 --lr 1e-4 --trainable lm_head --save llm/llama/data/finetuned_params.npz
+```
+
+Then load the tuned weights for generation:
+
+```bash
+python -m llm.llama.infer --prompt "A short domain sample" --finetuned llm/llama/data/finetuned_params.npz
+```
+
 We also implemented a pure inference version of CLIP, inspired by the NumPy version and dataset available [NPCLIP](https://github.com/99991/NPCLIP). To run it, imigrate `data` folder of `MPCLIP` into `llm/clip` folder and execute: 
 
 ```bash
 >>> python -m llm.clip.infer
 Label probs: [0.000953   0.48176003 0.51728696]
+```
+
+For parameter fine-tuning on CLIP, run:
+
+```bash
+python -m llm.clip.finetune --image llm/clip/picture.png --labels "a fish,a dog,a cat" --target 2 --steps 20 --lr 1e-5 --trainable text_encoder.proj,image_encoder.proj --save llm/clip/data/finetuned_clip_params.npz
+```
+
+Then load tuned parameters for inference:
+
+```bash
+python -m llm.clip.infer --image llm/clip/picture.png --labels "a fish,a dog,a cat" --finetuned llm/clip/data/finetuned_clip_params.npz
 ```
 
 for the following image and query ["a fish", "a dog", "a cat"]

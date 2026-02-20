@@ -7,6 +7,7 @@ import pydynet.nn as nn
 import pydynet.nn.functional as F
 
 
+
 def compute_cos_sin_cache(head_dim: int,
                           max_seq_len: int,
                           base: int = 10000,
@@ -188,7 +189,7 @@ class Llama(nn.Module):
         self.norm = nn.RMSNorm(embed_dim, dtype=dtype)
         self.lm_head = nn.Linear(embed_dim, vocab_size, dtype=dtype)
 
-    def forward(self, input_ids, start_pos: int):
+    def _forward_hidden(self, input_ids, start_pos: int):
         L = input_ids.shape[-1]
         h = self.tok_embedding(input_ids)
 
@@ -203,8 +204,55 @@ class Llama(nn.Module):
 
         for layer in self.layers:
             h = layer(h, start_pos, mask, freqs_cos, freqs_sin)
+        return self.norm(h)
 
-        logit = self.lm_head(self.norm(h)[:, [-1], :])
+    def forward_logits(self, input_ids, start_pos: int = 0):
+        """Return logits for all sequence positions (for fine-tuning)."""
+        return self.lm_head(self._forward_hidden(input_ids, start_pos))
+
+    def set_trainable_parameters(self, trainable_prefixes=("lm_head", )):
+        """Freeze all parameters except those with selected prefixes."""
+        trainable_count, frozen_count = 0, 0
+        for name, param in self._parameters.items():
+            is_trainable = any(name.startswith(prefix)
+                               for prefix in trainable_prefixes)
+            param.requires_grad = is_trainable
+            if is_trainable:
+                trainable_count += 1
+            else:
+                frozen_count += 1
+        return trainable_count, frozen_count
+
+    def finetune_step(self,
+                      input_ids,
+                      target_ids,
+                      optimizer,
+                      criterion=None,
+                      start_pos: int = 0):
+        """Run one fine-tuning step and return scalar loss."""
+        if criterion is None:
+            criterion = nn.CrossEntropyLoss()
+
+        self.train(True)
+        optimizer.zero_grad()
+
+        logits = self.forward_logits(input_ids, start_pos)
+        B, L, V = logits.shape
+
+        logits_2d = logits.reshape(B * L, V)
+        targets = pdn.Tensor(
+            np.asarray(target_ids).reshape(-1),
+            dtype=np.int64,
+            device=logits.device,
+        )
+
+        loss = criterion(logits_2d, targets)
+        loss.backward()
+        optimizer.step()
+        return loss.item()
+
+    def forward(self, input_ids, start_pos: int):
+        logit = self.lm_head(self._forward_hidden(input_ids, start_pos)[:, [-1], :])
         return logit
 
     def generate(self, input_ids, max_new_tokens: int):

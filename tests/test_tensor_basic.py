@@ -1,8 +1,12 @@
-import sys, pytest, random
-import numpy as np
+import random
+import sys
 from itertools import product
+from pathlib import Path
 
-sys.path.append('../pydynet')
+import numpy as np
+import pytest
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pydynet as pdn
 
