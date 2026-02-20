@@ -42,6 +42,18 @@ We also implemented a pure inference version of CLIP, inspired by the NumPy vers
 Label probs: [0.000953   0.48176003 0.51728696]
 ```
 
+For parameter fine-tuning on CLIP, run:
+
+```bash
+python -m llm.clip.finetune --image llm/clip/picture.png --labels "a fish,a dog,a cat" --target 2 --steps 20 --lr 1e-5 --trainable text_encoder.proj,image_encoder.proj --save llm/clip/data/finetuned_clip_params.npz
+```
+
+Then load tuned parameters for inference:
+
+```bash
+python -m llm.clip.infer --image llm/clip/picture.png --labels "a fish,a dog,a cat" --finetuned llm/clip/data/finetuned_clip_params.npz
+```
+
 for the following image and query ["a fish", "a dog", "a cat"]
 
 <img src="llm/clip/picture.png" alt="cat_dog" width="400px" />
