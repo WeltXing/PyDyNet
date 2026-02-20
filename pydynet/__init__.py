@@ -1,5 +1,5 @@
 from .core import (Tensor, add, sub, mul, div, pow, matmul, abs, sum, mean,
-                   min, max, min, argmax, argmin, maximum, minimum, exp, log,
+                   min, max, argmax, argmin, maximum, minimum, exp, log,
                    sign, reshape, transpose, swapaxes, concat, sigmoid, tanh,
                    sqrt, square, vsplit, hsplit, dsplit, split, unsqueeze,
                    squeeze)
