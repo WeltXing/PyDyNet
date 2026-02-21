@@ -8,7 +8,7 @@ setuptools.setup(
     author="Cun-Yuan Xing",
     author_email="xingcy@lamda.nju.edu.cn",
     maintainer="Cun-Yuan Xing",
-    maintainer_email="xingcy@lamad.nju.edu.cn",
+    maintainer_email="xingcy@lamda.nju.edu.cn",
     packages=[
         'pydynet', 'pydynet/optim', 'pydynet/nn', 'pydynet/nn/modules',
         'pydynet/core'

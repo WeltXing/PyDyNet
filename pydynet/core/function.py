@@ -166,10 +166,65 @@ def split(
     return sub_tensors
 
 
+def normalize_axis_tuple(axis, ndim, argname=None, allow_duplicate=False):
+    """
+    Strict public replacement for numpy.normalize_axis_tuple.
+
+    Parameters
+    ----------
+    axis : None, int or iterable of int
+    ndim : int
+        Number of dimensions.
+    argname : str, optional
+        Argument name for error messages.
+    allow_duplicate : bool, default False
+        Whether to allow repeated axes.
+
+    Returns
+    -------
+    tuple of int
+    """
+    if axis is None:
+        return tuple(range(ndim))
+
+    # --- convert to tuple ---
+    if isinstance(axis, int):
+        axis = (axis, )
+    else:
+        try:
+            axis = tuple(axis)
+        except TypeError:
+            name = f"'{argname}'" if argname else "axis"
+            raise TypeError(f"{name} must be int or iterable of ints")
+
+    normalized = []
+
+    for ax in axis:
+        if not isinstance(ax, int):
+            name = f"'{argname}'" if argname else "axis"
+            raise TypeError(f"{name} entries must be integers")
+
+        # --- handle negative axis ---
+        if ax < 0:
+            ax += ndim
+
+        # --- bounds check ---
+        if ax < 0 or ax >= ndim:
+            raise ValueError(f"axis {ax - ndim if ax >= ndim else ax} "
+                             f"is out of bounds for array of dimension {ndim}")
+
+        normalized.append(ax)
+
+    # --- duplicate check ---
+    if not allow_duplicate:
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("repeated axis in axis")
+
+    return tuple(normalized)
+
+
 def unsqueeze(x: Tensor, axis):
     '''等价于numpy的expand_dims, 因此我们借用了expand_dims的源码'''
-    from numpy.core.numeric import normalize_axis_tuple
-
     if type(axis) not in (tuple, list):
         axis = (axis, )
 
