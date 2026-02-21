@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='pydynet',
-    version='1.0',
+    version='1.1',
     description=
     'PyDyNet: Neuron Network (MLP, CNN, RNN, Transformer, ...) implementation using Numpy with Autodiff',
     author="Cun-Yuan Xing",
